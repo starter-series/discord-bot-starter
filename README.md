@@ -78,7 +78,7 @@ npm run dev
 - **CD Pipeline** — One-click deploy to Railway or Fly.io + auto GitHub Release
 - **Docker** — Production Dockerfile + dev compose with hot reload
 - **Version management** — `npm run version:patch/minor/major` to bump `package.json`
-- **Dev mode** — `npm run dev` for live reload with nodemon
+- **Dev mode** — `npm run dev` for live reload with `node --watch`
 - **Starter code** — `/ping` + `/help` commands, modular event handlers
 - **Deploy guides** — Step-by-step docs for Discord, Railway, and Fly.io setup
 - **Template setup** — Auto-creates setup checklist issue on first use

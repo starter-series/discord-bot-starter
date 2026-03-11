@@ -78,7 +78,7 @@ npm run dev
 - **CD 파이프라인** — 원클릭 Railway 또는 Fly.io 배포 + GitHub Release 자동 생성
 - **Docker** — 프로덕션 Dockerfile + 핫 리로드 개발용 compose
 - **버전 관리** — `npm run version:patch/minor/major`로 `package.json` 버전 업
-- **개발 모드** — `npm run dev`로 nodemon 라이브 리로드
+- **개발 모드** — `npm run dev`로 `node --watch` 라이브 리로드
 - **스타터 코드** — `/ping` + `/help` 커맨드, 모듈형 이벤트 핸들러
 - **배포 가이드** — Discord, Railway, Fly.io 설정 단계별 문서
 - **템플릿 셋업** — 첫 사용 시 설정 체크리스트 이슈 자동 생성

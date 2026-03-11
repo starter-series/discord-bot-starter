@@ -4,5 +4,5 @@ services:
     env_file: .env
     volumes:
       - ./src:/app/src
-    command: npx nodemon src/index.js
+    command: node --watch src/index.js
     restart: unless-stopped
