@@ -14,6 +14,16 @@ for (const file of commandFiles) {
   commands.push(command.data.toJSON());
 }
 
+if (!process.env.DISCORD_TOKEN) {
+  console.error('Missing DISCORD_TOKEN. Copy .env.example to .env and fill in your token.');
+  process.exit(1);
+}
+
+if (!process.env.DISCORD_CLIENT_ID) {
+  console.error('Missing DISCORD_CLIENT_ID. Add it to your .env file.');
+  process.exit(1);
+}
+
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 
 (async () => {

@@ -187,7 +187,7 @@ Commands are auto-loaded — no need to edit any other file.
 | Learning curve | Read the discord.js docs | Learn the framework's API |
 | CI/CD | Full pipeline included | Not included |
 | Docker | Production-ready | Not included |
-| Dependencies | 3 (discord.js, dotenv, nodemon) | 20+ |
+| Dependencies | 2 runtime (discord.js, dotenv) | 20+ |
 | AI/vibe-coding | LLMs generate clean vanilla JS | LLMs must learn framework conventions |
 | Best for | Utility bots, simple commands | Large bots with complex plugin systems |
 

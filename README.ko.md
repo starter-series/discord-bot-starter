@@ -187,7 +187,7 @@ module.exports = {
 | 학습 곡선 | discord.js 문서만 읽으면 됨 | 프레임워크 API 학습 필요 |
 | CI/CD | 풀 파이프라인 포함 | 미포함 |
 | Docker | 프로덕션 레디 | 미포함 |
-| 의존성 | 3개 (discord.js, dotenv, nodemon) | 20개+ |
+| 의존성 | 런타임 2개 (discord.js, dotenv) | 20개+ |
 | AI/바이브코딩 | LLM이 깔끔한 vanilla JS 생성 | LLM이 프레임워크 규칙을 알아야 함 |
 | 적합한 용도 | 유틸리티 봇, 간단한 커맨드 | 복잡한 플러그인 시스템의 대형 봇 |
 
