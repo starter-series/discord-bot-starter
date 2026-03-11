@@ -1,0 +1,68 @@
+name: Template Setup
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  setup:
+    if: github.event.created || github.run_number == 1
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if template
+        id: check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          if [ "$NAME" = "discord-bot-starter" ]; then
+            echo "is_template=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_template=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create setup checklist
+        if: steps.check.outputs.is_template == 'true'
+        run: |
+          gh issue create \
+            --title "Setup Checklist" \
+            --body "$(cat <<'ISSUE_BODY'
+          ## Required
+
+          - [ ] Copy \`.env.example\` to \`.env\` and fill in your tokens
+          - [ ] Update \`package.json\` (name, description)
+          - [ ] Register slash commands: \`npm run deploy-commands\`
+
+          ## Discord Bot Setup
+
+          Follow [docs/BOT_SETUP.md](docs/BOT_SETUP.md) to:
+
+          - [ ] Create application in Discord Developer Portal
+          - [ ] Create bot and copy token → \`DISCORD_TOKEN\`
+          - [ ] Copy Application ID → \`DISCORD_CLIENT_ID\`
+          - [ ] Enable required Privileged Gateway Intents (if needed)
+          - [ ] Invite bot to your server with proper permissions
+
+          ## CI/CD Setup (choose one)
+
+          ### Option A: Railway
+          Follow [docs/RAILWAY_DEPLOY.md](docs/RAILWAY_DEPLOY.md) to:
+          - [ ] Add secret: \`RAILWAY_TOKEN\`
+          - [ ] Add secret: \`RAILWAY_SERVICE_ID\`
+
+          ### Option B: Fly.io
+          Follow [docs/FLY_DEPLOY.md](docs/FLY_DEPLOY.md) to:
+          - [ ] Add secret: \`FLY_API_TOKEN\`
+          - [ ] Create \`fly.toml\` from \`fly.toml.example\`
+
+          ## Recommended
+
+          - [ ] Write tests for your commands
+          - [ ] Customize the \`/help\` command embed
+          - [ ] Delete this issue when done
+          ISSUE_BODY
+          )"
+        env:
+          GH_TOKEN: ${{ github.token }}

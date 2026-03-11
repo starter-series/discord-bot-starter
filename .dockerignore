@@ -1,0 +1,11 @@
+node_modules
+.env
+.git
+.github
+docs
+tests
+*.md
+.eslintrc.json
+.dockerignore
+docker-compose.yml
+fly.toml.example
