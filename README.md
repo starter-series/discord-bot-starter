@@ -27,7 +27,7 @@ cd my-bot
 # 2. Install dependencies
 npm install
 
-# 3. Set up environment
+# 3. Set up environment (see docs/DISCORD_SETUP.md for detailed guide)
 cp .env.example .env
 # Edit .env → add DISCORD_TOKEN and DISCORD_CLIENT_ID
 
@@ -65,9 +65,8 @@ npm run dev
 │   │   └── setup.yml             # Auto setup checklist on first use
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── docs/
-│   ├── BOT_SETUP.md              # Discord Developer Portal guide
-│   ├── RAILWAY_DEPLOY.md         # Railway deployment guide
-│   └── FLY_DEPLOY.md             # Fly.io deployment guide
+│   ├── DISCORD_SETUP.md          # Discord Developer Portal guide
+│   └── DEPLOY_GUIDE.md           # Railway & Fly.io deployment guide
 └── package.json
 ```
 
@@ -117,7 +116,7 @@ npm run dev
 | `RAILWAY_TOKEN` | Railway API token |
 | `RAILWAY_SERVICE_ID` | Target service ID |
 
-See **[docs/RAILWAY_DEPLOY.md](docs/RAILWAY_DEPLOY.md)** for setup guide.
+See **[docs/DEPLOY_GUIDE.md](docs/DEPLOY_GUIDE.md)** for setup guide.
 
 #### Fly.io (`cd-fly.yml`)
 
@@ -125,7 +124,7 @@ See **[docs/RAILWAY_DEPLOY.md](docs/RAILWAY_DEPLOY.md)** for setup guide.
 |--------|-------------|
 | `FLY_API_TOKEN` | Fly.io deploy token |
 
-See **[docs/FLY_DEPLOY.md](docs/FLY_DEPLOY.md)** for setup guide.
+See **[docs/DEPLOY_GUIDE.md](docs/DEPLOY_GUIDE.md)** for setup guide.
 
 ## Development
 
