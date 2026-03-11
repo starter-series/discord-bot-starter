@@ -6,7 +6,7 @@ on:
 
 jobs:
   setup:
-    if: github.event.created || github.run_number == 1
+    if: github.run_number == 1
     runs-on: ubuntu-latest
     permissions:
       issues: write
