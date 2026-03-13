@@ -35,10 +35,13 @@ jobs:
           fi
 
       - name: Validate secrets
+        env:
+          HAS_RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN != '' }}
+          HAS_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID != '' }}
         run: |
           MISSING=""
-          if [ -z "${{ secrets.RAILWAY_TOKEN }}" ]; then MISSING="$MISSING RAILWAY_TOKEN"; fi
-          if [ -z "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then MISSING="$MISSING RAILWAY_SERVICE_ID"; fi
+          if [ "$HAS_RAILWAY_TOKEN" != "true" ]; then MISSING="$MISSING RAILWAY_TOKEN"; fi
+          if [ "$HAS_SERVICE_ID" != "true" ]; then MISSING="$MISSING RAILWAY_SERVICE_ID"; fi
           if [ -n "$MISSING" ]; then
             echo "::error::Missing required secrets:$MISSING — See docs/RAILWAY_DEPLOY.md"
             exit 1

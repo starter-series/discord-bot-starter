@@ -35,8 +35,10 @@ jobs:
           fi
 
       - name: Validate secrets
+        env:
+          HAS_FLY_TOKEN: ${{ secrets.FLY_API_TOKEN != '' }}
         run: |
-          if [ -z "${{ secrets.FLY_API_TOKEN }}" ]; then
+          if [ "$HAS_FLY_TOKEN" != "true" ]; then
             echo "::error::Missing required secret: FLY_API_TOKEN — See docs/FLY_DEPLOY.md"
             exit 1
           fi
