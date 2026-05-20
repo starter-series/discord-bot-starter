@@ -45,7 +45,7 @@ npm run deploy-commands
 npm run dev
 ```
 
-Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md) 참고.
+Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md)를 참고해 주세요.
 
 ## 포함된 구성
 
@@ -54,24 +54,34 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
 │   ├── index.js                  # 진입점
 │   ├── config.js                 # 환경변수 설정 로더
 │   ├── commands/                 # 슬래시 커맨드 (자동 로드)
+│   │   ├── index.js              # 로더
 │   │   ├── ping.js               # /ping — 지연시간 확인
 │   │   ├── help.js               # /help — 커맨드 목록
 │   │   └── search.js             # /search — 자동완성 예제
-│   └── events/                   # 이벤트 핸들러 (자동 로드)
-│       ├── ready.js              # 봇 준비 완료
-│       └── interactionCreate.js  # 커맨드 라우터
+│   ├── events/                   # 이벤트 핸들러 (자동 로드)
+│   │   ├── ready.js              # 봇 준비 완료
+│   │   ├── interactionCreate.js  # 커맨드 라우터
+│   │   ├── error.js              # 클라이언트 에러 로거
+│   │   └── warn.js               # 클라이언트 경고 로거
+│   └── lib/
+│       ├── health.js             # HTTP 헬스 서버
+│       ├── logger.js             # 구조화 로거
+│       ├── rate-limiter.js       # 사용자/커맨드별 토큰 버킷 제한
+│       └── safe-interaction.js   # 절대 throw하지 않는 reply/editReply/followUp 래퍼
 ├── scripts/
 │   ├── deploy-commands.js        # Discord API에 커맨드 등록
 │   └── bump-version.js           # package.json 버전 업
-├── tests/
-│   └── commands.test.js          # 구조 검증 테스트
+├── tests/                        # Jest — 테스트 27개, 커버리지 임계값 statements 70 %
 ├── Dockerfile                    # 프로덕션 컨테이너
 ├── docker-compose.yml            # 핫 리로드 개발 환경
 ├── .github/
 │   ├── workflows/
-│   │   ├── ci.yml                # 린트, 테스트, Docker 빌드
-│   │   ├── cd-railway.yml        # Railway 배포
+│   │   ├── ci.yml                # 린트, 테스트, Docker 빌드, Trivy 스캔
+│   │   ├── codeql.yml            # CodeQL 정적 분석
+│   │   ├── cd-railway.yml        # Railway 배포 (액션은 SHA로 핀)
 │   │   ├── cd-fly.yml            # Fly.io 배포
+│   │   ├── maintenance.yml       # 주간 CI 헬스 체크
+│   │   ├── stale.yml             # 비활성 이슈/PR 정리
 │   │   └── setup.yml             # 첫 사용 시 자동 설정 체크리스트
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── docs/
@@ -80,20 +90,66 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
 └── package.json
 ```
 
-## 주요 기능
+## 현재 구현된 것 (Currently implemented)
 
-- **Discord.js v14** — 슬래시 커맨드, 임베드, 자동 로드 커맨드/이벤트 핸들러
-- **CI 파이프라인** — 보안 감사, 린트, 테스트, Docker 빌드 검증
-- **CD 파이프라인** — 원클릭 Railway 또는 Fly.io 배포 + GitHub Release 자동 생성
-- **Docker** — 프로덕션 Dockerfile + 핫 리로드 개발용 compose
-- **헬스 체크** — `GET /health` + Docker `HEALTHCHECK` 내장 — Fly.io / Railway가 죽은 봇을 감지
-- **버전 관리** — `npm run version:patch/minor/major`로 `package.json` 버전 업
-- **개발 모드** — `npm run dev`로 `node --watch` 라이브 리로드
-- **스타터 코드** — `/ping`, `/help`, `/search` (autocomplete 예제) 커맨드, 모듈형 이벤트 핸들러
-- **배포 가이드** — Discord, Railway, Fly.io 설정 단계별 문서
-- **템플릿 셋업** — 첫 사용 시 설정 체크리스트 이슈 자동 생성
+오늘자로 코드에 실제로 존재하는 것들입니다.
 
-## CI/CD
+- **Discord.js v14** — 슬래시 커맨드, 임베드, 자동 로드 커맨드/이벤트 핸들러.
+- **스타터 코드** — `/ping`, `/help`, `/search` (autocomplete 패턴); `ready`, `interactionCreate`, `error`, `warn` 이벤트.
+- **런타임 안전성**
+  - `src/lib/safe-interaction.js` — `safeReply` / `safeEditReply` / `safeFollowUp`이 만료된 인터랙션, 중복 ack, unknown message 같은 Discord API 에러를 던지지 않고 흡수합니다.
+  - `src/lib/rate-limiter.js` — 사용자/커맨드별 토큰 버킷 제한. 커맨드가 `rateLimit: { window, max }`을 export하면 옵트인됩니다.
+  - `src/lib/health.js` — `HEALTH_PORT` (기본 `3000`) 위 `/health` 엔드포인트. Dockerfile `HEALTHCHECK`에 연결되어 있습니다.
+- **공급망 강화 (Supply-chain hardening)**
+  - 의존성을 설치하는 모든 CI/CD에서 `npm ci --ignore-scripts` — 트랜시티브 의존성의 install-time 임의 코드 실행 차단.
+  - `package-lock.json` 커밋 및 `npm ci`로 강제.
+  - Railway 배포 액션을 떠다니는 태그가 아닌 커밋 SHA로 핀.
+  - `gitleaks` `8.30.1`로 핀, sha256 체크섬 검증.
+- **CI 파이프라인** (모든 PR + main push 시) — `npm audit`, ESLint, Jest `--coverage` (statements / branches / functions / lines 모두 게이트), Docker 빌드, Trivy CRITICAL/HIGH 스캔.
+- **CodeQL** — push/PR + 주간 정적 분석.
+- **CD 파이프라인** — 원클릭 Railway 또는 Fly.io 배포 + GitHub Release 자동 생성. Actions 탭에서 수동 실행.
+- **Docker** — 프로덕션 `Dockerfile` + 핫 리로드 개발용 `docker-compose.yml`.
+- **버전 관리** — `npm run version:patch/minor/major`. CD에서 git 태그 중복 가드.
+- **유지보수 자동화** — 주간 CI 헬스 체크, 비활성 이슈/PR 정리, 첫 사용 시 설정 체크리스트.
+- **이중 언어 README** — 영어 + 한국어.
+
+## 계획 (Planned)
+
+진행 중인 로드맵 항목은 없습니다. 이 템플릿은 유지보수 단계이며, 보안 패치와 Discord.js 메이저 업그레이드는 Dependabot으로 들어옵니다. 구체적인 추가 제안이 있다면 이슈를 열어 주세요.
+
+## 설계 의도 (Design intent)
+
+이 템플릿이 *왜* 이런 모양인지에 대한 설명입니다.
+
+**프레임워크가 아니라 가벼운 스타터.** [Sapphire](https://github.com/sapphiredev/framework)와 [Akairo](https://github.com/discord-akairo/discord-akairo)는 discord.js 위에 구조를 더하지만, 이 템플릿은 의도적으로 그러지 않습니다. 가치는 CI/CD, Docker, 공급망 자세, 런타임 안전성 라이브러리에 있지 — 자체 커맨드 디스패처에 있는 게 아닙니다.
+
+|  | 이 템플릿 | Sapphire / Akairo |
+|---|---|---|
+| 철학 | 가벼운 스타터 + CI/CD + Docker | 런타임이 있는 풀 프레임워크 |
+| 추상화 | Vanilla discord.js | 프레임워크 고유 패턴 |
+| CI/CD | 풀 파이프라인 포함 | 미포함 |
+| Docker | 프로덕션 레디 | 미포함 |
+| 런타임 의존성 | 2개 (discord.js, dotenv) | 20개+ |
+| AI/바이브코딩 | LLM이 깔끔한 vanilla JS 생성 | LLM이 프레임워크 규칙 학습 필요 |
+| 적합한 용도 | 유틸리티 봇, 간단한 커맨드 | 복잡한 플러그인 시스템의 대형 봇 |
+
+**안전성은 `src/lib/`에, 커맨드 파일이 아닌 곳에 산다.** 레이트 리미팅과 Discord API 에러 흡수는 import해서 쓰는 헬퍼지, 프레임워크 마법이 아닙니다. 커맨드 파일 하나는 30초 안에 위에서 아래로 읽을 수 있어야 합니다.
+
+**공급망 자세가 차별점.** `--ignore-scripts`, SHA로 핀된 액션, lockfile-강제 install, gitleaks 체크섬 검증 — 모든 Discord 봇 템플릿이 갖춰야 할 것들이지만 대부분 갖추지 않은 것들. 이게 이 스타터가 존재하는 이유입니다.
+
+**기본은 JavaScript.** Vanilla JS가 LLM이 코드를 쓸 때 가장 깨끗한 출력을 만들고, 빌드 단계도 없앱니다. TypeScript는 선택입니다 (Non-goals 참고).
+
+## 비목표 (Non-goals)
+
+이 템플릿이 **되지 않을** 것들입니다.
+
+- **Discord 봇 프레임워크.** 커맨드 그룹, 사전 조건 DSL, 플러그인 로더 없음. 그게 필요하면 Sapphire를 쓰세요.
+- **기본 TypeScript.** 빌드 단계와 타입 설정은 가장 흔한 용도(슬래시 커맨드 몇 개)에는 가치보다 비용이 큽니다. TS는 아래 4단계 옵트인이지 기본이 아닙니다.
+- **다중 DB 스타터.** ORM 없음, 마이그레이션 프레임워크 없음. 영속성이 필요하면 Prisma, Drizzle, plain `pg` 등을 직접 가져오세요.
+- **Discord 기능 종합 키트.** 음성, 음악, 모더레이션 툴킷 없음. 슬래시 커맨드 + 인터랙션만이며, 나머지는 직접 추가하세요.
+- **자동 업데이트 템플릿.** 일단 clone하면 당신의 코드입니다. `starter-series upgrade` 같은 경로는 없고, 그게 의도입니다(숨겨진 호환성 계약 없음).
+
+## CI / CD 세부
 
 ### CI (모든 PR + main push 시)
 
@@ -101,9 +157,9 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
 |------|------|
 | 보안 감사 | `npm audit`로 의존성 취약점 확인 |
 | 린트 | ESLint 코드 품질 검사 |
-| 테스트 | Jest (기본적으로 테스트 없이도 통과) |
+| 테스트 | Jest `--coverage`, 임계값은 `package.json`에서 강제 |
 | Docker 빌드 | 컨테이너 이미지 빌드로 빌드 오류 검출 |
-| Trivy 스캔 | 컨테이너 이미지의 CRITICAL/HIGH CVE 취약점 스캔 |
+| Trivy 스캔 | 컨테이너 이미지의 CRITICAL/HIGH CVE 스캔 |
 
 ### 보안 & 유지보수
 
@@ -135,8 +191,6 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
 |--------|------|
 | `RAILWAY_TOKEN` | Railway API 토큰 |
 | `RAILWAY_SERVICE_ID` | 대상 서비스 ID |
-
-자세한 설정은 **[docs/DEPLOY_GUIDE.md](docs/DEPLOY_GUIDE.md)** 참고.
 
 #### Fly.io (`cd-fly.yml`)
 
@@ -170,7 +224,7 @@ npm test
 
 ## 커맨드 추가하기
 
-`src/commands/`에 새 파일을 만드세요:
+`src/commands/`에 새 파일을 만들어 주세요:
 
 ```js
 // src/commands/echo.js
@@ -183,6 +237,9 @@ module.exports = {
     .addStringOption(option =>
       option.setName('text').setDescription('따라할 텍스트').setRequired(true)
     ),
+
+  // 선택: 레이트 리미팅 옵트인
+  rateLimit: { window: 5000, max: 3 },
 
   async execute(interaction) {
     const text = interaction.options.getString('text');
@@ -197,7 +254,7 @@ module.exports = {
 
 ### 자동완성 (Autocomplete)
 
-자동완성 패턴은 `src/commands/search.js`를 참고하세요. 옵션에 `.setAutocomplete(true)`를 붙이고, `execute`와 함께 `autocomplete(interaction)` 함수를 export하면 됩니다:
+자동완성 패턴은 `src/commands/search.js`를 참고해 주세요. 옵션에 `.setAutocomplete(true)`를 붙이고, `execute`와 함께 `autocomplete(interaction)` 함수를 export하면 됩니다:
 
 ```js
 async autocomplete(interaction) {
@@ -212,42 +269,12 @@ async autocomplete(interaction) {
 
 `src/events/interactionCreate.js`의 디스패처가 `isAutocomplete()` 인터랙션을 자동으로 이 핸들러로 라우팅합니다.
 
-## Sapphire / Akairo 대신 이걸 쓰는 이유
-
-[Sapphire](https://github.com/sapphiredev/framework) (700+ stars)와 [Akairo](https://github.com/discord-akairo/discord-akairo) (600+ stars)는 discord.js 위에 구조를 추가하는 봇 **프레임워크**입니다. 이 템플릿은 다른 접근입니다:
-
-|  | 이 템플릿 | Sapphire / Akairo |
-|---|---|---|
-| 철학 | CI/CD를 갖춘 가벼운 스타터 | 런타임을 포함한 풀 프레임워크 |
-| 추상화 | Vanilla discord.js | 프레임워크 고유 패턴 |
-| 학습 곡선 | discord.js 문서만 읽으면 됨 | 프레임워크 API 학습 필요 |
-| CI/CD | 풀 파이프라인 포함 | 미포함 |
-| Docker | 프로덕션 레디 | 미포함 |
-| 의존성 | 런타임 2개 (discord.js, dotenv) | 20개+ |
-| AI/바이브코딩 | LLM이 깔끔한 vanilla JS 생성 | LLM이 프레임워크 규칙을 알아야 함 |
-| 적합한 용도 | 유틸리티 봇, 간단한 커맨드 | 복잡한 플러그인 시스템의 대형 봇 |
-
-**이 템플릿을 선택하세요:**
-- 봇이 실제로 뭘 하는지 한 줄 한 줄 이해하고 싶을 때
-- 프로덕션 CI/CD + Docker가 바로 필요할 때 (이걸 제공하는 다른 템플릿은 없습니다)
-- AI 도구로 봇 코드를 생성할 때 — vanilla discord.js가 가장 깔끔한 AI 출력을 만듭니다
-- 플러그인 아키텍처가 아닌 슬래시 커맨드 봇을 만들 때
-
-**Sapphire/Akairo를 선택하세요:**
-- 내장된 커맨드 파싱과 사전 조건 시스템이 필요할 때
-- 대형 멀티 모듈 봇을 위한 플러그인 아키텍처가 필요할 때
-- 인자 타입, 인히비터 등 프레임워크 수준의 기능이 필요할 때
-
-### TypeScript는?
-
-이 템플릿은 단순함을 위해 JavaScript를 사용합니다. TypeScript가 필요하면:
+### TypeScript 옵트인
 
 1. `devDependencies`에 `typescript`와 `@types/node` 추가
 2. `tsconfig.json` 추가
 3. `npm start`를 `dist/`에서 빌드 후 실행하도록 수정
 4. `.js` 파일을 `.ts`로 변경
-
-TypeScript는 강제가 아니라 선택입니다. 많은 봇 (유틸리티 커맨드, 간단한 자동화)에는 JavaScript만으로 충분합니다.
 
 ## 헬스 체크
 
