@@ -54,25 +54,35 @@ See [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md) for the Discord Developer Por
 │   ├── index.js                  # Entry point
 │   ├── config.js                 # Environment config loader
 │   ├── commands/                 # Slash commands (auto-loaded)
+│   │   ├── index.js              # Loader
 │   │   ├── ping.js               # /ping — check latency
 │   │   ├── help.js               # /help — list commands
 │   │   └── search.js             # /search — autocomplete example
-│   └── events/                   # Event handlers (auto-loaded)
-│       ├── ready.js              # Bot ready
-│       └── interactionCreate.js  # Command router
+│   ├── events/                   # Event handlers (auto-loaded)
+│   │   ├── ready.js              # Bot ready
+│   │   ├── interactionCreate.js  # Command router
+│   │   ├── error.js              # Client error logger
+│   │   └── warn.js               # Client warn logger
+│   └── lib/
+│       ├── health.js             # HTTP health server
+│       ├── logger.js             # Structured logger
+│       ├── rate-limiter.js       # Per-user / per-command token bucket
+│       └── safe-interaction.js   # reply/editReply/followUp wrapper that never throws
 ├── scripts/
 │   ├── deploy-commands.js        # Register commands with Discord API
 │   └── bump-version.js           # Bump package.json version
-├── tests/
-│   └── commands.test.js          # Structure validation tests
+├── tests/                        # Jest — 27 tests, coverage gated at 70 % statements
 ├── Dockerfile                    # Production container
 ├── docker-compose.yml            # Dev with hot reload
 ├── .github/
 │   ├── workflows/
-│   │   ├── ci.yml                # Lint, test, Docker build
-│   │   ├── cd-railway.yml        # Deploy to Railway
+│   │   ├── ci.yml                # Lint, test, Docker build, Trivy scan
+│   │   ├── codeql.yml            # CodeQL static analysis
+│   │   ├── cd-railway.yml        # Deploy to Railway (action pinned by SHA)
 │   │   ├── cd-fly.yml            # Deploy to Fly.io
-│   │   └── setup.yml             # Auto setup checklist on first use
+│   │   ├── maintenance.yml       # Weekly CI health check
+│   │   ├── stale.yml             # Stale issue/PR sweep
+│   │   └── setup.yml             # First-use setup checklist
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── docs/
 │   ├── DISCORD_SETUP.md          # Discord Developer Portal guide
@@ -80,20 +90,66 @@ See [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md) for the Discord Developer Por
 └── package.json
 ```
 
-## Features
+## Currently implemented
 
-- **Discord.js v14** — Slash commands, embeds, auto-loaded command/event handlers
-- **CI Pipeline** — Security audit, lint, test, Docker build verification on every push
-- **CD Pipeline** — One-click deploy to Railway or Fly.io + auto GitHub Release
-- **Docker** — Production Dockerfile + dev compose with hot reload
-- **Health endpoint** — Built-in `GET /health` + Docker `HEALTHCHECK` so Fly.io / Railway can detect a crashed bot
-- **Version management** — `npm run version:patch/minor/major` to bump `package.json`
-- **Dev mode** — `npm run dev` for live reload with `node --watch`
-- **Starter code** — `/ping`, `/help`, and `/search` (autocomplete pattern) commands, modular event handlers
-- **Deploy guides** — Step-by-step docs for Discord, Railway, and Fly.io setup
-- **Template setup** — Auto-creates setup checklist issue on first use
+Things that exist in this repo today, backed by code on disk.
 
-## CI/CD
+- **Discord.js v14** — slash commands, embeds, auto-loaded command/event handlers.
+- **Starter code** — `/ping`, `/help`, `/search` (autocomplete pattern); `ready`, `interactionCreate`, `error`, `warn` events.
+- **Runtime safety**
+  - `src/lib/safe-interaction.js` — `safeReply` / `safeEditReply` / `safeFollowUp` that swallow Discord API errors (expired interactions, double-ack, unknown message) instead of crashing the process.
+  - `src/lib/rate-limiter.js` — per-user / per-command token-bucket limiter; commands opt in by exporting `rateLimit: { window, max }`.
+  - `src/lib/health.js` — HTTP `/health` endpoint at `HEALTH_PORT` (default `3000`), wired into `Dockerfile` `HEALTHCHECK`.
+- **Supply-chain hardening**
+  - `npm ci --ignore-scripts` everywhere CI/CD touches dependencies — no install-time arbitrary code from transitive deps.
+  - `package-lock.json` committed and required by `npm ci`.
+  - Railway deploy action pinned by commit SHA, not a floating tag.
+  - `gitleaks` pinned to `8.30.1` with sha256 checksum verification.
+- **CI pipeline** (every PR + push to main) — `npm audit`, ESLint, Jest with `--coverage` (statements / branches / functions / lines all gated), Docker build, Trivy CRITICAL/HIGH scan.
+- **CodeQL** — static analysis on push/PR and weekly.
+- **CD pipelines** — one-shot Railway or Fly.io deploy + auto GitHub Release; manual trigger from the Actions tab.
+- **Docker** — production `Dockerfile` + `docker-compose.yml` for hot-reload dev.
+- **Version management** — `npm run version:patch/minor/major` with a git-tag duplicate guard in CD.
+- **Maintenance automation** — weekly CI health check, stale issue/PR sweep, first-use setup checklist.
+- **Bilingual README** — English + Korean.
+
+## Planned
+
+No active roadmap items. The template is in steady-state maintenance; security patches and Discord.js majors are applied via Dependabot. Open an issue if you have a concrete addition in mind.
+
+## Design intent
+
+*Why* this template is shaped the way it is.
+
+**Thin starter, not a framework.** [Sapphire](https://github.com/sapphiredev/framework) and [Akairo](https://github.com/discord-akairo/discord-akairo) add structure on top of discord.js. This template deliberately does not. The value sits in CI/CD, Docker, the supply-chain posture, and the runtime-safety lib — not in a custom command dispatcher.
+
+|  | This template | Sapphire / Akairo |
+|---|---|---|
+| Philosophy | Thin starter + CI/CD + Docker | Full framework with runtime |
+| Abstraction | Vanilla discord.js | Framework-specific patterns |
+| CI/CD | Full pipeline included | Not included |
+| Docker | Production-ready | Not included |
+| Runtime deps | 2 (discord.js, dotenv) | 20+ |
+| AI/vibe-coding | LLMs generate clean vanilla JS | LLMs must learn framework conventions |
+| Best for | Utility bots, simple commands | Large bots with complex plugin systems |
+
+**Safety lives in `src/lib/`, not in the command files.** Rate limiting and Discord-API error swallowing are imported helpers, not framework magic. Each command is one file you can read top-to-bottom in 30 seconds.
+
+**Supply-chain posture is the differentiator.** `--ignore-scripts`, pinned actions, lockfile-enforced installs, and gitleaks checksum-verification are the kind of thing every Discord bot template should have — and most don't. That is the reason this starter exists.
+
+**JavaScript by default.** Vanilla JS produces the cleanest output when an LLM writes the code, and it removes the build step. TypeScript is opt-in (see Non-goals).
+
+## Non-goals
+
+Things this template will not become.
+
+- **A Discord bot framework.** No command groups, no preconditions DSL, no plugin loader. If you need those, use Sapphire.
+- **TypeScript by default.** The build step and type configuration aren't worth it for the most common use case (a few slash commands). Adding TS is a 4-step opt-in documented below, not a default.
+- **A multi-database starter.** No ORM, no migration framework. Bring your own (Prisma, Drizzle, plain `pg`) if you need persistence.
+- **A Discord-feature kitchen sink.** No voice, no music, no moderation toolkit. Slash commands + interactions only; everything else is yours to add.
+- **An auto-updating template.** Once you clone, it's your code. There is no `starter-series upgrade` path — that is by design (no hidden compatibility contract).
+
+## CI / CD details
 
 ### CI (every PR + push to main)
 
@@ -101,11 +157,11 @@ See [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md) for the Discord Developer Por
 |------|-------------|
 | Security audit | `npm audit` for dependency vulnerabilities |
 | Lint | ESLint for code quality |
-| Test | Jest (passes with no tests by default) |
+| Test | Jest with `--coverage`, thresholds enforced in `package.json` |
 | Docker build | Builds the container image to catch build errors |
 | Trivy scan | Scans the container image for CRITICAL/HIGH CVEs |
 
-### Security & Maintenance
+### Security & maintenance
 
 | Workflow | What it does |
 |----------|-------------|
@@ -135,8 +191,6 @@ See [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md) for the Discord Developer Por
 |--------|-------------|
 | `RAILWAY_TOKEN` | Railway API token |
 | `RAILWAY_SERVICE_ID` | Target service ID |
-
-See **[docs/DEPLOY_GUIDE.md](docs/DEPLOY_GUIDE.md)** for setup guide.
 
 #### Fly.io (`cd-fly.yml`)
 
@@ -168,7 +222,7 @@ npm run lint
 npm test
 ```
 
-## Adding Commands
+## Adding commands
 
 Create a new file in `src/commands/`:
 
@@ -183,6 +237,9 @@ module.exports = {
     .addStringOption(option =>
       option.setName('text').setDescription('Text to repeat').setRequired(true)
     ),
+
+  // Optional: opt into rate limiting
+  rateLimit: { window: 5000, max: 3 },
 
   async execute(interaction) {
     const text = interaction.options.getString('text');
@@ -212,44 +269,14 @@ async autocomplete(interaction) {
 
 The dispatcher in `src/events/interactionCreate.js` routes `isAutocomplete()` interactions to this handler automatically.
 
-## Why This Over Sapphire / Akairo?
+### Opting into TypeScript
 
-[Sapphire](https://github.com/sapphiredev/framework) (700+ stars) and [Akairo](https://github.com/discord-akairo/discord-akairo) (600+ stars) are Discord bot **frameworks** that add structure on top of discord.js. This template takes a different approach:
-
-|  | This template | Sapphire / Akairo |
-|---|---|---|
-| Philosophy | Thin starter with CI/CD | Full framework with runtime |
-| Abstraction | Vanilla discord.js | Framework-specific patterns |
-| Learning curve | Read the discord.js docs | Learn the framework's API |
-| CI/CD | Full pipeline included | Not included |
-| Docker | Production-ready | Not included |
-| Dependencies | 2 runtime (discord.js, dotenv) | 20+ |
-| AI/vibe-coding | LLMs generate clean vanilla JS | LLMs must learn framework conventions |
-| Best for | Utility bots, simple commands | Large bots with complex plugin systems |
-
-**Choose this template if:**
-- You want to understand what your bot actually does, line by line
-- You need production CI/CD + Docker out of the box (no other template provides this)
-- You're using AI tools to generate bot code — vanilla discord.js produces the cleanest AI output
-- Your bot has slash commands, not a plugin architecture
-
-**Choose Sapphire/Akairo if:**
-- You need a built-in command parsing and preconditions system
-- You want plugin architecture for a large, multi-module bot
-- You need framework-level features like argument types and inhibitors
-
-### What about TypeScript?
-
-This template uses JavaScript for simplicity. To add TypeScript:
-
-1. Add `typescript` and `@types/node` to devDependencies
+1. Add `typescript` and `@types/node` to `devDependencies`
 2. Add a `tsconfig.json`
 3. Update `npm start` to build and run from `dist/`
 4. Rename `.js` files to `.ts`
 
-TypeScript is opt-in, not forced. For many bots (utility commands, simple automation), JavaScript is all you need.
-
-## Health Check
+## Health check
 
 The bot exposes a tiny HTTP health server (`src/lib/health.js`) on `HEALTH_PORT` (default `3000`). It's used by the Docker `HEALTHCHECK` and by Fly.io / Railway to detect a crashed or disconnected bot process.
 
