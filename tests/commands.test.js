@@ -62,34 +62,32 @@ describe('/ping command', () => {
 describe('/search command', () => {
   const search = require(path.join(commandsPath, 'search.js'));
 
+  const makeSearchInteraction = (query) => ({
+    options: { getString: jest.fn().mockReturnValue(query) },
+    reply: jest.fn().mockResolvedValue(undefined),
+  });
+
   test('execute replies with the selected query, mentions disabled', async () => {
-    const interaction = {
-      options: { getString: jest.fn().mockReturnValue('docker') },
-      reply: jest.fn().mockResolvedValue(undefined),
-    };
+    const interaction = makeSearchInteraction('docker');
 
     await search.execute(interaction);
 
     expect(interaction.options.getString).toHaveBeenCalledWith('query');
-    expect(interaction.reply).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content: 'You picked: `docker`',
-        allowedMentions: { parse: [] },
-      })
-    );
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'You picked: `docker`',
+      allowedMentions: { parse: [] },
+    });
   });
 
   test('execute strips backticks from user input to keep code span intact', async () => {
-    const interaction = {
-      options: { getString: jest.fn().mockReturnValue('evil`@everyone`payload') },
-      reply: jest.fn().mockResolvedValue(undefined),
-    };
+    const interaction = makeSearchInteraction('evil`@everyone`payload');
 
     await search.execute(interaction);
 
-    const payload = interaction.reply.mock.calls[0][0];
-    expect(payload.content).toBe('You picked: `evil@everyonepayload`');
-    expect(payload.allowedMentions).toEqual({ parse: [] });
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'You picked: `evil@everyonepayload`',
+      allowedMentions: { parse: [] },
+    });
   });
 
   test('autocomplete returns filtered, capped suggestions', async () => {

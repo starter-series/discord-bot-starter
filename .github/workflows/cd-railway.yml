@@ -57,7 +57,6 @@ jobs:
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
 
       - name: Create GitHub Release
-        # Pinned by SHA — third-party action. Bump via Dependabot only.
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: v${{ steps.version.outputs.version }}

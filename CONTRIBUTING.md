@@ -38,12 +38,8 @@ a PR.
 
 ## What's out of scope
 
-- A command framework, plugin loader, or command-group DSL — see _Non-goals_.
-- Default TypeScript — the four-step opt-in stays an opt-in.
-- A bundled database / ORM / queue — bring-your-own.
-- Voice, music, moderation toolkits — slash commands + interactions only.
-
-If you're unsure whether a change is in scope, open an issue first.
+See the README's [_Non-goals_](README.md#non-goals) — those are binding here.
+If you're unsure whether a change fits, open an issue first.
 
 ## Commits + PRs
 

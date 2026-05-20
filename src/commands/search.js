@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 
 // Static list — replace with a DB query, API call, or cached list in your bot.
 const CHOICES = [
@@ -14,10 +14,9 @@ const CHOICES = [
   'typescript',
 ];
 
-// User-supplied strings interpolated into Discord markdown can break out of
-// `code spans` by including their own backticks (or use @ / # to ping channels
-// and users). The safe default is to (a) strip backticks before quoting, and
-// (b) suppress mention parsing on the response.
+// A backtick in user input breaks out of the surrounding markdown `code span`,
+// letting the rest of the message render as formatted text. Strip backticks
+// so the code span stays intact; allowedMentions handles the @-mention side.
 function safeQuote(input) {
   return String(input).replaceAll('`', '');
 }
@@ -38,9 +37,7 @@ module.exports = {
     const query = interaction.options.getString('query');
     await interaction.reply({
       content: `You picked: \`${safeQuote(query)}\``,
-      // SuppressNotifications keeps the reply silent; allowedMentions: parse: []
-      // makes any @here / @everyone / @role / @user in user input inert.
-      flags: MessageFlags.SuppressNotifications,
+      // Any @here / @everyone / @role / @user in user input becomes inert text.
       allowedMentions: { parse: [] },
     });
   },
