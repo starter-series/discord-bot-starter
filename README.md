@@ -101,10 +101,15 @@ Things that exist in this repo today, backed by code on disk.
   - `src/lib/rate-limiter.js` — per-user / per-command token-bucket limiter; commands opt in by exporting `rateLimit: { window, max }`.
   - `src/lib/health.js` — HTTP `/health` endpoint at `HEALTH_PORT` (default `3000`), wired into `Dockerfile` `HEALTHCHECK`.
 - **Supply-chain hardening**
-  - `npm ci --ignore-scripts` everywhere CI/CD touches dependencies — no install-time arbitrary code from transitive deps.
+  - `npm ci --ignore-scripts` everywhere — CI workflows, Railway CLI install, **and the production Docker build**. No install-time arbitrary code from transitive deps.
   - `package-lock.json` committed and required by `npm ci`.
-  - Railway deploy action pinned by commit SHA, not a floating tag.
+  - All third-party GitHub Actions pinned by **commit SHA**, not a floating tag (`softprops/action-gh-release`, `superfly/flyctl-actions/setup-flyctl`, `aquasecurity/trivy-action`). Bumps land via Dependabot only.
   - `gitleaks` pinned to `8.30.1` with sha256 checksum verification.
+  - GitHub Secret Scanning + Push Protection + Dependabot security updates enabled at the repo level (push-time block, not just post-hoc scan).
+- **Runtime crash handling**
+  - `process.on('uncaughtException')` and `process.on('unhandledRejection')` route through the structured logger before exit — orchestrators get a stack, not silent death.
+  - SIGINT/SIGTERM trigger graceful shutdown of the gateway client and health server.
+  - `--enable-source-maps` on `npm start` / `npm dev` for legible stack traces.
 - **CI pipeline** (every PR + push to main) — `npm audit`, ESLint, Jest with `--coverage` (statements / branches / functions / lines all gated), Docker build, Trivy CRITICAL/HIGH scan.
 - **CodeQL** — static analysis on push/PR and weekly.
 - **CD pipelines** — one-shot Railway or Fly.io deploy + auto GitHub Release; manual trigger from the Actions tab.
@@ -159,7 +164,7 @@ Things this template will not become.
 | Lint | ESLint for code quality |
 | Test | Jest with `--coverage`, thresholds enforced in `package.json` |
 | Docker build | Builds the container image to catch build errors |
-| Trivy scan | Scans the container image for CRITICAL/HIGH CVEs |
+| Trivy scan | Scans the container image for CRITICAL CVEs (SHA-pinned action) |
 
 ### Security & maintenance
 

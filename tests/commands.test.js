@@ -62,7 +62,7 @@ describe('/ping command', () => {
 describe('/search command', () => {
   const search = require(path.join(commandsPath, 'search.js'));
 
-  test('execute replies with the selected query', async () => {
+  test('execute replies with the selected query, mentions disabled', async () => {
     const interaction = {
       options: { getString: jest.fn().mockReturnValue('docker') },
       reply: jest.fn().mockResolvedValue(undefined),
@@ -71,7 +71,25 @@ describe('/search command', () => {
     await search.execute(interaction);
 
     expect(interaction.options.getString).toHaveBeenCalledWith('query');
-    expect(interaction.reply).toHaveBeenCalledWith('You picked: `docker`');
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: 'You picked: `docker`',
+        allowedMentions: { parse: [] },
+      })
+    );
+  });
+
+  test('execute strips backticks from user input to keep code span intact', async () => {
+    const interaction = {
+      options: { getString: jest.fn().mockReturnValue('evil`@everyone`payload') },
+      reply: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await search.execute(interaction);
+
+    const payload = interaction.reply.mock.calls[0][0];
+    expect(payload.content).toBe('You picked: `evil@everyonepayload`');
+    expect(payload.allowedMentions).toEqual({ parse: [] });
   });
 
   test('autocomplete returns filtered, capped suggestions', async () => {

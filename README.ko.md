@@ -101,10 +101,15 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
   - `src/lib/rate-limiter.js` — 사용자/커맨드별 토큰 버킷 제한. 커맨드가 `rateLimit: { window, max }`을 export하면 옵트인됩니다.
   - `src/lib/health.js` — `HEALTH_PORT` (기본 `3000`) 위 `/health` 엔드포인트. Dockerfile `HEALTHCHECK`에 연결되어 있습니다.
 - **공급망 강화 (Supply-chain hardening)**
-  - 의존성을 설치하는 모든 CI/CD에서 `npm ci --ignore-scripts` — 트랜시티브 의존성의 install-time 임의 코드 실행 차단.
+  - `npm ci --ignore-scripts`을 모든 곳에서 적용 — CI 워크플로, Railway CLI 설치, **그리고 프로덕션 Docker 빌드까지**. 트랜시티브 의존성의 install-time 임의 코드 실행 차단.
   - `package-lock.json` 커밋 및 `npm ci`로 강제.
-  - Railway 배포 액션을 떠다니는 태그가 아닌 커밋 SHA로 핀.
+  - 모든 third-party GitHub Action을 **커밋 SHA**로 핀(`softprops/action-gh-release`, `superfly/flyctl-actions/setup-flyctl`, `aquasecurity/trivy-action`). 떠다니는 태그 사용 금지. 업그레이드는 Dependabot으로만.
   - `gitleaks` `8.30.1`로 핀, sha256 체크섬 검증.
+  - GitHub Secret Scanning + Push Protection + Dependabot security updates 활성화 (push 시점 차단, 사후 스캔 아님).
+- **런타임 크래시 처리**
+  - `process.on('uncaughtException')` + `process.on('unhandledRejection')`이 구조화 로거를 통과한 뒤 exit — 오케스트레이터가 stack을 보고, 조용한 죽음이 아님.
+  - SIGINT/SIGTERM이 게이트웨이 클라이언트 + 헬스 서버를 우아하게 종료.
+  - `npm start` / `npm dev`에 `--enable-source-maps`로 읽기 쉬운 stack trace.
 - **CI 파이프라인** (모든 PR + main push 시) — `npm audit`, ESLint, Jest `--coverage` (statements / branches / functions / lines 모두 게이트), Docker 빌드, Trivy CRITICAL/HIGH 스캔.
 - **CodeQL** — push/PR + 주간 정적 분석.
 - **CD 파이프라인** — 원클릭 Railway 또는 Fly.io 배포 + GitHub Release 자동 생성. Actions 탭에서 수동 실행.
@@ -159,7 +164,7 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
 | 린트 | ESLint 코드 품질 검사 |
 | 테스트 | Jest `--coverage`, 임계값은 `package.json`에서 강제 |
 | Docker 빌드 | 컨테이너 이미지 빌드로 빌드 오류 검출 |
-| Trivy 스캔 | 컨테이너 이미지의 CRITICAL/HIGH CVE 스캔 |
+| Trivy 스캔 | 컨테이너 이미지의 CRITICAL CVE 스캔 (SHA로 핀된 액션) |
 
 ### 보안 & 유지보수
 
