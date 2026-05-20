@@ -1,10 +1,47 @@
-# Copy this file to fly.toml and update the app name.
-# Discord bots are worker processes — no HTTP services needed.
+# Fly.io configuration for discord-bot-starter.
+#
+# Usage:
+#   1. Copy this file to `fly.toml`.
+#   2. Set `app` to a unique name (Fly.io app names are global).
+#   3. Set `primary_region` to your closest region (`fly platform regions`).
+#   4. Run `flyctl launch --copy-config --no-deploy` once to register the app.
+#   5. Set the FLY_API_TOKEN secret in GitHub: `flyctl tokens create deploy`.
+#   6. Trigger the `Deploy to Fly.io` workflow from the Actions tab.
+#
+# `fly.toml` is gitignored — keep it local. This `.example` is checked in.
 
-app = "your-bot-name"
+app = "your-bot-app-name"
 primary_region = "nrt"
 
 [build]
+  dockerfile = "Dockerfile"
 
 [env]
+  HEALTH_PORT = "3000"
   NODE_ENV = "production"
+
+# Fly.io machines stop themselves when idle and restart on incoming traffic.
+# A Discord bot maintains a persistent WebSocket to the Discord gateway, so
+# `auto_stop_machines` must be `off` — otherwise the bot disconnects.
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Health check — keeps the platform from killing a wedged process.
+  # See src/lib/health.js for the `/health` semantics.
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "get"
+    path = "/health"
+
+# Single small machine is plenty for a bot serving a few hundred guilds.
+# Scale up via `flyctl scale vm shared-cpu-2x` when you have evidence.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

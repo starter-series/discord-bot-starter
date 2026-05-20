@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Check for large files
@@ -65,7 +65,9 @@ jobs:
         run: docker build -t discord-bot-starter:test .
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
+        # Pinned by SHA — trivy-action suffered tag hijacks in 2025-08 and 2026-03.
+        # Bump via Dependabot only; never via floating tag.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: discord-bot-starter:test
           exit-code: '1'

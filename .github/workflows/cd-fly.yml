@@ -44,7 +44,9 @@ jobs:
           fi
 
       - name: Setup Fly.io CLI
-        uses: superfly/flyctl-actions/setup-flyctl@v2
+        # Pinned by SHA — superfly/flyctl-actions has no v2 tag despite older docs;
+        # @master HEAD is what the action README recommends. Bump via Dependabot only.
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # master @ 2024-11-04
 
       - name: Deploy
         run: flyctl deploy --remote-only
@@ -52,7 +54,8 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        # Pinned by SHA — third-party action. Bump via Dependabot only.
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}

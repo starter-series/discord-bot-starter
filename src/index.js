@@ -45,6 +45,27 @@ const shutdown = async (signal) => {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
+// Without these handlers, an uncaught error or unhandled promise rejection
+// would exit the process silently — orchestrators see only "container died,"
+// not the stack. Log the structured entry first, then let the default Node
+// behavior kill the process so Railway/Fly.io restarts the container.
+process.on('uncaughtException', (err, origin) => {
+  log.error('lifecycle', 'uncaughtException', {
+    error: err?.message ?? String(err),
+    stack: err?.stack,
+    origin,
+  });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  log.error('lifecycle', 'unhandledRejection', {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+  process.exit(1);
+});
+
 client.login(config.token).catch((err) => {
   log.error('lifecycle', 'Failed to log in', { error: err.message });
   process.exit(1);
