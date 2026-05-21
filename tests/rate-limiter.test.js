@@ -41,7 +41,10 @@ describe('createRateLimiter', () => {
     }
   });
 
-  test('cleanup removes stale entries', () => {
+  test('cleanup actually removes stale entries (not just check() resetting them)', () => {
+    // The previous version of this test passed even when cleanup() was a no-op,
+    // because check() already resets entries whose window has elapsed. Asserting
+    // store size directly is the only way to observe cleanup's real effect.
     const realNow = Date.now;
     let now = 1_000_000;
     Date.now = () => now;
@@ -49,11 +52,28 @@ describe('createRateLimiter', () => {
       const limiter = createRateLimiter(5, 1_000);
       limiter.check('u1');
       limiter.check('u2');
+      expect(limiter.size()).toBe(2);
+
       now += 5_000; // way past the window
       limiter.cleanup();
-      // After cleanup, brand-new entry. Same start as `now`.
-      const fresh = limiter.check('u1');
-      expect(fresh.limited).toBe(false);
+      expect(limiter.size()).toBe(0);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  test('cleanup keeps entries still inside the window', () => {
+    const realNow = Date.now;
+    let now = 1_000_000;
+    Date.now = () => now;
+    try {
+      const limiter = createRateLimiter(5, 10_000);
+      limiter.check('u1');
+      limiter.check('u2');
+
+      now += 5_000; // half the window — entries are still live
+      limiter.cleanup();
+      expect(limiter.size()).toBe(2);
     } finally {
       Date.now = realNow;
     }

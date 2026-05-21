@@ -16,8 +16,21 @@ const log = require('./logger');
  * @param {{ port?: number }} [options]
  * @returns {import('http').Server}
  */
+function resolvePort(options) {
+  if (options.port !== undefined) return options.port; // tests pass 0 for ephemeral
+  const raw = process.env.HEALTH_PORT;
+  if (raw === undefined || raw === '') return 3000;
+  const parsed = Number(raw);
+  // A typo like HEALTH_PORT=abc previously fell back to 3000 silently;
+  // surface it so the operator finds out at startup, not from a wedged probe.
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
+    throw new Error(`Invalid HEALTH_PORT="${raw}" — must be an integer in [0, 65535]`);
+  }
+  return parsed;
+}
+
 function createHealthServer(client, options = {}) {
-  const port = options.port ?? (Number(process.env.HEALTH_PORT) || 3000);
+  const port = resolvePort(options);
 
   const server = http.createServer((req, res) => {
     if (req.method !== 'GET' || req.url !== '/health') {
