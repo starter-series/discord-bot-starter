@@ -173,6 +173,20 @@ describe('interactionCreate dispatcher rate-limit contract', () => {
     expect(command.execute).toHaveBeenCalledTimes(5);
     expect(interactions[5].reply.mock.calls[0][0].content).toMatch(/too fast/);
   });
+
+  test('unknown command name → user-facing error reply, no execute call', async () => {
+    // Client.commands.get returns undefined → the early-return branch at
+    // src/events/interactionCreate.js:38-45 fires. Was uncovered before.
+    const client = { commands: { get: () => undefined } };
+    const interaction = makeInteraction('audit-user-unknown', 'ghost-cmd', client);
+
+    await interactionCreate.execute(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledTimes(1);
+    const payload = interaction.reply.mock.calls[0][0];
+    expect(payload.content).toMatch(/Unknown command:/);
+    expect(payload.content).toMatch(/ghost-cmd/);
+  });
 });
 
 describe('Event modules', () => {

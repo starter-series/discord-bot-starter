@@ -62,6 +62,30 @@ describe('health server', () => {
     }
   });
 
+  test('throws on invalid HEALTH_PORT — silent fallback was hiding operator typos', () => {
+    const client = fakeClient({ ready: true });
+    const prev = process.env.HEALTH_PORT;
+    process.env.HEALTH_PORT = 'abc';
+    try {
+      expect(() => createHealthServer(client)).toThrow(/Invalid HEALTH_PORT/);
+    } finally {
+      if (prev === undefined) delete process.env.HEALTH_PORT;
+      else process.env.HEALTH_PORT = prev;
+    }
+  });
+
+  test('throws on out-of-range HEALTH_PORT', () => {
+    const client = fakeClient({ ready: true });
+    const prev = process.env.HEALTH_PORT;
+    process.env.HEALTH_PORT = '99999';
+    try {
+      expect(() => createHealthServer(client)).toThrow(/Invalid HEALTH_PORT/);
+    } finally {
+      if (prev === undefined) delete process.env.HEALTH_PORT;
+      else process.env.HEALTH_PORT = prev;
+    }
+  });
+
   test('returns 404 for unknown paths', async () => {
     const client = fakeClient({ ready: true });
     const server = createHealthServer(client, { port: 0 });
