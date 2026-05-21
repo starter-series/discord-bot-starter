@@ -112,6 +112,69 @@ describe('/search command', () => {
   });
 });
 
+describe('interactionCreate dispatcher rate-limit contract', () => {
+  // Verifies the per-command rate-limit contract documented in README:
+  // "commands override the global limit by exporting rateLimit: { window, max }".
+  // Without this test, the README claim was fictional — the previous dispatcher
+  // hardcoded the global limit and ignored the field.
+  const interactionCreate = require(path.join(__dirname, '..', 'src', 'events', 'interactionCreate.js'));
+
+  function makeCommand(name, rateLimit) {
+    return {
+      data: { name },
+      execute: jest.fn().mockResolvedValue(undefined),
+      ...(rateLimit && { rateLimit }),
+    };
+  }
+
+  function makeInteraction(userId, commandName, client) {
+    return {
+      user: { id: userId },
+      commandName,
+      isAutocomplete: () => false,
+      isChatInputCommand: () => true,
+      client,
+      deferred: false,
+      replied: false,
+      reply: jest.fn().mockResolvedValue(undefined),
+      followUp: jest.fn(),
+      editReply: jest.fn(),
+    };
+  }
+
+  // The dispatcher is a singleton — limiter state leaks between tests within
+  // the same process. We use unique user IDs per test to dodge cross-contamination.
+  test('rate-limit field on a command overrides the global limit', async () => {
+    const command = makeCommand('tight-cmd', { window: 60_000, max: 2 });
+    const client = { commands: { get: () => command } };
+
+    const interactions = Array.from({ length: 3 }, () =>
+      makeInteraction('audit-user-tight', 'tight-cmd', client)
+    );
+
+    for (const i of interactions) await interactionCreate.execute(i);
+
+    // First two execute, third is rate-limited (max=2).
+    expect(command.execute).toHaveBeenCalledTimes(2);
+    expect(interactions[2].reply.mock.calls[0][0].content).toMatch(/too fast/);
+  });
+
+  test('command without rate-limit field falls back to the global 5/min limit', async () => {
+    const command = makeCommand('loose-cmd'); // no rateLimit
+    const client = { commands: { get: () => command } };
+
+    const interactions = Array.from({ length: 6 }, () =>
+      makeInteraction('audit-user-loose', 'loose-cmd', client)
+    );
+
+    for (const i of interactions) await interactionCreate.execute(i);
+
+    // Global default is 5/min, so the 6th is limited.
+    expect(command.execute).toHaveBeenCalledTimes(5);
+    expect(interactions[5].reply.mock.calls[0][0].content).toMatch(/too fast/);
+  });
+});
+
 describe('Event modules', () => {
   const eventsPath = path.join(__dirname, '..', 'src', 'events');
   const eventFiles = fs

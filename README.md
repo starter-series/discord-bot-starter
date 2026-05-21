@@ -67,7 +67,7 @@ See [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md) for the Discord Developer Por
 │       ├── health.js             # HTTP health server
 │       ├── logger.js             # Structured logger
 │       ├── rate-limiter.js       # Per-user / per-command token bucket
-│       └── safe-interaction.js   # reply/editReply/followUp wrapper that never throws
+│       └── safe-interaction.js   # safeRespond() — reply/editReply/followUp wrapper that never throws
 ├── scripts/
 │   ├── deploy-commands.js        # Register commands with Discord API
 │   └── bump-version.js           # Bump package.json version
@@ -97,8 +97,8 @@ Things that exist in this repo today, backed by code on disk.
 - **Discord.js v14** — slash commands, embeds, auto-loaded command/event handlers.
 - **Starter code** — `/ping`, `/help`, `/search` (autocomplete pattern); `ready`, `interactionCreate`, `error`, `warn` events.
 - **Runtime safety**
-  - `src/lib/safe-interaction.js` — `safeReply` / `safeEditReply` / `safeFollowUp` that swallow Discord API errors (expired interactions, double-ack, unknown message) instead of crashing the process.
-  - `src/lib/rate-limiter.js` — per-user / per-command token-bucket limiter; commands opt in by exporting `rateLimit: { window, max }`.
+  - `src/lib/safe-interaction.js` — `safeRespond(interaction, payload)` picks the right method (`reply` / `editReply` / `followUp`) based on the interaction state, and swallows Discord API errors (expired interactions, double-ack, unknown message) instead of crashing the process.
+  - `src/lib/rate-limiter.js` — fixed-window per-key limiter. Global default is 5 invocations per user per 60 s; individual commands override that by exporting `rateLimit: { window, max }`.
   - `src/lib/health.js` — HTTP `/health` endpoint at `HEALTH_PORT` (default `3000`), wired into `Dockerfile` `HEALTHCHECK`.
 - **Supply-chain hardening**
   - `npm ci --ignore-scripts` everywhere — CI workflows, Railway CLI install, **and the production Docker build**. No install-time arbitrary code from transitive deps.

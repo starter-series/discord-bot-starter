@@ -42,6 +42,11 @@ function createRateLimiter(maxHits = 5, windowMs = 60_000) {
         if (now - entry.start >= windowMs) store.delete(key);
       }
     },
+
+    /** Number of entries currently held — for observability and tests. */
+    size() {
+      return store.size;
+    },
   };
 }
 

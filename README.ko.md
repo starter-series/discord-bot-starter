@@ -67,7 +67,7 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
 │       ├── health.js             # HTTP 헬스 서버
 │       ├── logger.js             # 구조화 로거
 │       ├── rate-limiter.js       # 사용자/커맨드별 토큰 버킷 제한
-│       └── safe-interaction.js   # 절대 throw하지 않는 reply/editReply/followUp 래퍼
+│       └── safe-interaction.js   # safeRespond() — 절대 throw하지 않는 reply/editReply/followUp 래퍼
 ├── scripts/
 │   ├── deploy-commands.js        # Discord API에 커맨드 등록
 │   └── bump-version.js           # package.json 버전 업
@@ -97,8 +97,8 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
 - **Discord.js v14** — 슬래시 커맨드, 임베드, 자동 로드 커맨드/이벤트 핸들러.
 - **스타터 코드** — `/ping`, `/help`, `/search` (autocomplete 패턴); `ready`, `interactionCreate`, `error`, `warn` 이벤트.
 - **런타임 안전성**
-  - `src/lib/safe-interaction.js` — `safeReply` / `safeEditReply` / `safeFollowUp`이 만료된 인터랙션, 중복 ack, unknown message 같은 Discord API 에러를 던지지 않고 흡수합니다.
-  - `src/lib/rate-limiter.js` — 사용자/커맨드별 토큰 버킷 제한. 커맨드가 `rateLimit: { window, max }`을 export하면 옵트인됩니다.
+  - `src/lib/safe-interaction.js` — `safeRespond(interaction, payload)`이 인터랙션 상태에 따라 `reply` / `editReply` / `followUp` 중 적절한 것을 골라 호출하고, 만료된 인터랙션 / 중복 ack / unknown message 같은 Discord API 에러를 던지지 않고 흡수합니다.
+  - `src/lib/rate-limiter.js` — 고정 윈도우 키별 제한. 글로벌 기본값은 사용자당 60초에 5회. 커맨드가 `rateLimit: { window, max }`을 export하면 그 값으로 덮어쓰기.
   - `src/lib/health.js` — `HEALTH_PORT` (기본 `3000`) 위 `/health` 엔드포인트. Dockerfile `HEALTHCHECK`에 연결되어 있습니다.
 - **공급망 강화 (Supply-chain hardening)**
   - `npm ci --ignore-scripts`을 모든 곳에서 적용 — CI 워크플로, Railway CLI 설치, **그리고 프로덕션 Docker 빌드까지**. 트랜시티브 의존성의 install-time 임의 코드 실행 차단.
