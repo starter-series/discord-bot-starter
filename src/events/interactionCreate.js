@@ -2,15 +2,30 @@ const { Events, MessageFlags } = require('discord.js');
 const logger = require('../lib/logger');
 const { createRateLimiter } = require('../lib/rate-limiter');
 const { safeRespond } = require('../lib/safe-interaction');
+const { errMsg } = require('../lib/err');
 
 // Global per-user limiter: 5 invocations per minute across all commands.
 // Used when a command does not declare its own `rateLimit` field.
 const globalLimiter = createRateLimiter(5, 60_000);
+// Bounded today by the static src/commands/ directory. If a future plugin
+// loader registers commands dynamically, add an upper-bound assertion here
+// — Map has no eviction by design.
 const perCommandLimiters = new Map();
 
 function limiterFor(command) {
   const cfg = command.rateLimit;
-  if (!cfg) return globalLimiter;
+  if (cfg === undefined || cfg === null) return globalLimiter;
+  // Strict shape check: partial { max } or {} previously silently fell back
+  // to createRateLimiter's parameter defaults (5, 60_000), so the user's
+  // attempt to override looked active but matched the global. Fail loud.
+  if (typeof cfg !== 'object' ||
+      !Number.isInteger(cfg.max) || cfg.max < 1 ||
+      !Number.isInteger(cfg.window) || cfg.window < 1) {
+    throw new Error(
+      `Command "${command.data?.name ?? '<unnamed>'}" has invalid rateLimit ` +
+      `${JSON.stringify(cfg)} — must be { window: positive integer ms, max: positive integer }`
+    );
+  }
   const name = command.data.name;
   let limiter = perCommandLimiters.get(name);
   if (!limiter) {
@@ -26,9 +41,6 @@ setInterval(() => {
   globalLimiter.cleanup();
   for (const limiter of perCommandLimiters.values()) limiter.cleanup();
 }, 120_000).unref();
-
-// Extract a human message from an unknown thrown value (Error, string, null).
-const errMsg = (e) => (e instanceof Error ? e.message : String(e));
 
 module.exports = {
   name: Events.InteractionCreate,

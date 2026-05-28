@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 const commandsPath = path.join(__dirname, '..', 'src', 'commands');
 const commandFiles = fs
@@ -144,7 +144,7 @@ describe('interactionCreate dispatcher rate-limit contract', () => {
 
   // The dispatcher is a singleton — limiter state leaks between tests within
   // the same process. We use unique user IDs per test to dodge cross-contamination.
-  test('rate-limit field on a command overrides the global limit', async () => {
+  test('rate-limit field on a command overrides the global limit, reply is ephemeral', async () => {
     const command = makeCommand('tight-cmd', { window: 60_000, max: 2 });
     const client = { commands: { get: () => command } };
 
@@ -154,13 +154,16 @@ describe('interactionCreate dispatcher rate-limit contract', () => {
 
     for (const i of interactions) await interactionCreate.execute(i);
 
-    // First two execute, third is rate-limited (max=2).
     expect(command.execute).toHaveBeenCalledTimes(2);
-    expect(interactions[2].reply.mock.calls[0][0].content).toMatch(/too fast/);
+    const payload = interactions[2].reply.mock.calls[0][0];
+    expect(payload.content).toMatch(/too fast/);
+    // Ephemeral flag must be on — otherwise spammers' "too fast" notices
+    // become public channel posts.
+    expect(payload.flags).toBe(MessageFlags.Ephemeral);
   });
 
-  test('command without rate-limit field falls back to the global 5/min limit', async () => {
-    const command = makeCommand('loose-cmd'); // no rateLimit
+  test('command without rate-limit field falls back to the global 5/min limit, reply is ephemeral', async () => {
+    const command = makeCommand('loose-cmd');
     const client = { commands: { get: () => command } };
 
     const interactions = Array.from({ length: 6 }, () =>
@@ -169,14 +172,13 @@ describe('interactionCreate dispatcher rate-limit contract', () => {
 
     for (const i of interactions) await interactionCreate.execute(i);
 
-    // Global default is 5/min, so the 6th is limited.
     expect(command.execute).toHaveBeenCalledTimes(5);
-    expect(interactions[5].reply.mock.calls[0][0].content).toMatch(/too fast/);
+    const payload = interactions[5].reply.mock.calls[0][0];
+    expect(payload.content).toMatch(/too fast/);
+    expect(payload.flags).toBe(MessageFlags.Ephemeral);
   });
 
-  test('unknown command name → user-facing error reply, no execute call', async () => {
-    // Client.commands.get returns undefined → the early-return branch at
-    // src/events/interactionCreate.js:38-45 fires. Was uncovered before.
+  test('unknown command name → user-facing ephemeral error reply, no execute call', async () => {
     const client = { commands: { get: () => undefined } };
     const interaction = makeInteraction('audit-user-unknown', 'ghost-cmd', client);
 
@@ -186,6 +188,25 @@ describe('interactionCreate dispatcher rate-limit contract', () => {
     const payload = interaction.reply.mock.calls[0][0];
     expect(payload.content).toMatch(/Unknown command:/);
     expect(payload.content).toMatch(/ghost-cmd/);
+    expect(payload.flags).toBe(MessageFlags.Ephemeral);
+  });
+
+  // Each invalid shape used to silently fall back to global defaults
+  // (rateLimit:{}) or produce catastrophic limiter behavior (max:0 bans
+  // forever; window:0 disables limiting). Now they fail loud.
+  test.each([
+    [{}, 'missing both'],
+    [{ max: 5 }, 'missing window'],
+    [{ window: 60_000 }, 'missing max'],
+    [{ max: 0, window: 60_000 }, 'max=0 (would ban forever)'],
+    [{ max: 5, window: 0 }, 'window=0 (would disable limiting)'],
+    [{ max: -1, window: 60_000 }, 'negative max'],
+    [{ max: 1.5, window: 60_000 }, 'non-integer max'],
+  ])('malformed rateLimit %p rejects at dispatch (%s)', async (cfg) => {
+    const command = makeCommand('malformed-' + Math.random().toString(36).slice(2, 8), cfg);
+    const client = { commands: { get: () => command } };
+    const interaction = makeInteraction('audit-user-malformed', command.data.name, client);
+    await expect(interactionCreate.execute(interaction)).rejects.toThrow(/invalid rateLimit/);
   });
 });
 

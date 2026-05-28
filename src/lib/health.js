@@ -1,5 +1,6 @@
 const http = require('http');
 const log = require('./logger');
+const { errMsg } = require('./err');
 
 /**
  * Create a minimal health-check HTTP server.
@@ -17,14 +18,27 @@ const log = require('./logger');
  * @returns {import('http').Server}
  */
 function resolvePort(options) {
-  if (options.port !== undefined) return options.port; // tests pass 0 for ephemeral
+  // Code-supplied port wins, but explicit null falls through to env/default
+  // — `null` from a JSON loader's missing field should not silently bind
+  // an ephemeral port via http.listen(null).
+  if (options.port !== undefined && options.port !== null) return options.port;
   const raw = process.env.HEALTH_PORT;
   if (raw === undefined || raw === '') return 3000;
+  // Strict decimal-integer match — rejects whitespace (' '), scientific
+  // notation ('1e3'), hex ('0x80'), and trailing-junk ('3000abc'). The
+  // previous `Number(raw) || 3000` silently coerced bad input to NaN→0→3000;
+  // the post-PR-#38 `Number.isInteger(Number(raw))` still accepted those
+  // surprising forms because Number() is lenient.
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`Invalid HEALTH_PORT="${raw}" — must be a decimal integer in [1, 65535]`);
+  }
   const parsed = Number(raw);
-  // A typo like HEALTH_PORT=abc previously fell back to 3000 silently;
-  // surface it so the operator finds out at startup, not from a wedged probe.
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
-    throw new Error(`Invalid HEALTH_PORT="${raw}" — must be an integer in [0, 65535]`);
+  // 0 from env is rejected: the previous `Number('0') || 3000` mapped it to
+  // 3000 because 0 is falsy. Preserve that behavior loudly (throw) rather
+  // than silently binding an ephemeral port — operators almost never want
+  // OS-assigned ports for a healthcheck. Tests still use options.port=0.
+  if (parsed < 1 || parsed > 65535) {
+    throw new Error(`Invalid HEALTH_PORT="${raw}" — must be a decimal integer in [1, 65535]`);
   }
   return parsed;
 }
@@ -52,7 +66,7 @@ function createHealthServer(client, options = {}) {
   });
 
   server.on('error', (err) => {
-    log.error('health', 'Health server error', { error: err.message });
+    log.error('health', 'Health server error', { error: errMsg(err) });
   });
 
   function start() {
