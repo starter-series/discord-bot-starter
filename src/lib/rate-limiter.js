@@ -13,6 +13,16 @@
  * @param {number} windowMs - Time window in milliseconds.
  */
 function createRateLimiter(maxHits = 5, windowMs = 60_000) {
+  // Loud validation rather than silent misconfiguration: maxHits=0 would
+  // permanently ban every key; windowMs=0 would reset the entry on every
+  // check() (no-op limiter). Both produced catastrophically wrong behavior
+  // before this guard, identified by /code-review pass 2026-05-21.
+  if (!Number.isInteger(maxHits) || maxHits < 1) {
+    throw new Error(`createRateLimiter: maxHits must be a positive integer, got ${maxHits}`);
+  }
+  if (!Number.isInteger(windowMs) || windowMs < 1) {
+    throw new Error(`createRateLimiter: windowMs must be a positive integer, got ${windowMs}`);
+  }
   const store = new Map();
 
   return {

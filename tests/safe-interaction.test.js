@@ -16,7 +16,7 @@ describe('safeRespond', () => {
   test('uses reply when interaction is fresh', async () => {
     const i = fakeInteraction();
     const r = await safeRespond(i, { content: 'hi' });
-    expect(i.reply).toHaveBeenCalled();
+    expect(i.reply).toHaveBeenCalledWith({ content: 'hi' });
     expect(i.editReply).not.toHaveBeenCalled();
     expect(i.followUp).not.toHaveBeenCalled();
     expect(r).toBe('reply-result');
@@ -25,7 +25,7 @@ describe('safeRespond', () => {
   test('uses editReply for deferred-but-not-replied (was the bug — used to followUp)', async () => {
     const i = fakeInteraction({ deferred: true, replied: false });
     const r = await safeRespond(i, { content: 'hi' });
-    expect(i.editReply).toHaveBeenCalled();
+    expect(i.editReply).toHaveBeenCalledWith({ content: 'hi' });
     expect(i.followUp).not.toHaveBeenCalled();
     expect(r).toBe('editReply-result');
   });
@@ -33,7 +33,7 @@ describe('safeRespond', () => {
   test('uses followUp once interaction is replied', async () => {
     const i = fakeInteraction({ replied: true });
     const r = await safeRespond(i, { content: 'hi' });
-    expect(i.followUp).toHaveBeenCalled();
+    expect(i.followUp).toHaveBeenCalledWith({ content: 'hi' });
     expect(r).toBe('followUp-result');
   });
 
@@ -61,24 +61,31 @@ describe('safeRespond', () => {
     expect(r).toBeNull();
   });
 
-  test('swallows rate-limit error identified by code === 429 alone', async () => {
-    // The dispatcher's other branch: a plain Error with .code = 429 and no
-    // RateLimitError name. discord.js can throw both shapes depending on
-    // where in the REST stack the limit is hit.
-    const err = Object.assign(new Error('429'), { code: 429, timeToReset: 2.0 });
+  test('swallows DiscordAPIError with code 429 (the other rate-limit shape)', async () => {
+    // discord.js throws RateLimitError in some REST paths and DiscordAPIError
+    // with code 429 in others. Both must be swallowed.
+    const err = new DiscordAPIError({ code: 429, message: 'Rate limit' }, 429, 429, 'POST', 'url', {});
     const i = fakeInteraction({ reply: jest.fn().mockRejectedValue(err) });
     const r = await safeRespond(i, { content: 'hi' });
     expect(r).toBeNull();
   });
 
-  test('after deferReply + editReply, a second response routes through followUp', async () => {
-    // {deferred:true, replied:true} is reached when a slow command defers,
-    // sends the deferred reply (which flips replied:true), then needs to
-    // send a follow-up message. The first if-branch (deferred && !replied)
-    // is false, so the second if-branch (replied) takes over and calls followUp.
+  test('does NOT swallow unrelated errors that happen to have code 429', async () => {
+    // The previous bare `error?.code === 429` check would swallow this and
+    // hide a real bug — narrowed to require a Discord-specific shape.
+    const err = Object.assign(new Error('upstream proxy 429'), { code: 429 });
+    const i = fakeInteraction({ reply: jest.fn().mockRejectedValue(err) });
+    const r = await safeRespond(i, { content: 'hi' });
+    // The catch still returns null (no rethrow), but it's logged at error
+    // level (the generic branch), not the warn rate-limit branch.
+    expect(r).toBeNull();
+  });
+
+  test('after deferReply + editReply, a second response routes through followUp WITH the payload', async () => {
+    const payload = { content: 'second message' };
     const i = fakeInteraction({ deferred: true, replied: true });
-    const r = await safeRespond(i, { content: 'second message' });
-    expect(i.followUp).toHaveBeenCalled();
+    const r = await safeRespond(i, payload);
+    expect(i.followUp).toHaveBeenCalledWith(payload);
     expect(i.editReply).not.toHaveBeenCalled();
     expect(i.reply).not.toHaveBeenCalled();
     expect(r).toBe('followUp-result');

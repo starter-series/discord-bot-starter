@@ -10,6 +10,13 @@ const TRANSIENT_API_CODES = new Set([
   40060, // Interaction has already been acknowledged
 ]);
 
+// instanceof DiscordAPIError fails across realm boundaries (two copies of
+// discord.js in the dep tree from hoisting failure or peerDep mismatch).
+// Match by class name as a fallback so cross-realm errors are still
+// classified correctly. Same rationale for RateLimitError below.
+const isDiscordAPIError = (e) => e instanceof DiscordAPIError || e?.name === 'DiscordAPIError';
+const isRateLimitError = (e) => e?.name === 'RateLimitError';
+
 /**
  * Reply to an interaction, choosing reply vs. followUp based on whether
  * the interaction has already been answered. Swallows transient API errors
@@ -35,14 +42,17 @@ async function safeRespond(interaction, payload) {
     }
     return await interaction.reply(payload);
   } catch (error) {
-    if (error instanceof DiscordAPIError && TRANSIENT_API_CODES.has(error.code)) {
+    if (isDiscordAPIError(error) && TRANSIENT_API_CODES.has(error.code)) {
       logger.warn('safe-interaction', 'transient API error, dropping reply', {
         code: error.code,
         message: error.message,
       });
       return null;
     }
-    if (error?.name === 'RateLimitError' || error?.code === 429) {
+    // Narrow to Discord-specific shapes — a stray middleware error with
+    // code === 429 unrelated to Discord rate limiting was being silently
+    // swallowed before this guard (caught in /code-review 2026-05-21).
+    if (isRateLimitError(error) || (isDiscordAPIError(error) && error.code === 429)) {
       logger.warn('safe-interaction', 'rate-limited by Discord, dropping reply', {
         retryAfter: error.retryAfter ?? error.timeToReset ?? null,
       });

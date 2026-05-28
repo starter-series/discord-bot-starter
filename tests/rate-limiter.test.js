@@ -1,6 +1,21 @@
 const { createRateLimiter } = require('../src/lib/rate-limiter');
 
 describe('createRateLimiter', () => {
+  test.each([
+    [0, 60_000],
+    [-1, 60_000],
+    [5, 0],
+    [5, -100],
+    [1.5, 60_000],
+    [5, 1000.5],
+    ['five', 60_000],
+    [5, null],
+  ])('throws on invalid args (maxHits=%p, windowMs=%p)', (maxHits, windowMs) => {
+    expect(() => createRateLimiter(maxHits, windowMs)).toThrow(
+      /must be a positive integer/
+    );
+  });
+
   test('allows up to maxHits within the window', () => {
     const limiter = createRateLimiter(3, 60_000);
     expect(limiter.check('u1').limited).toBe(false);

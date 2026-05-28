@@ -4,6 +4,19 @@ const { loadEvents } = require('./events');
 const { createHealthServer } = require('./lib/health');
 const config = require('./config');
 const log = require('./lib/logger');
+const { errMsg, errStack } = require('./lib/err');
+
+// fatalExit + handlers must be registered BEFORE any code that can throw
+// during module evaluation (loadCommands, loadEvents, createHealthServer).
+// Otherwise a startup throw exits with a raw V8 stack and the operator
+// loses the structured 'lifecycle' log line the rest of this file promises.
+const fatalExit = (kind, err, extra = {}) => {
+  log.fatal('lifecycle', kind, { error: errMsg(err), stack: errStack(err), ...extra });
+  process.exit(1);
+};
+
+process.on('uncaughtException', (err, origin) => fatalExit('uncaughtException', err, { origin }));
+process.on('unhandledRejection', (reason) => fatalExit('unhandledRejection', reason));
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -20,7 +33,7 @@ const healthServer = createHealthServer(client);
 // Railway, Docker HEALTHCHECK) only get a 200 after the gateway connects.
 client.once(Events.ClientReady, () => {
   healthServer.start().catch((err) => {
-    log.error('health', 'Failed to start health server', { error: err.message });
+    log.error('health', 'Failed to start health server', { error: errMsg(err) });
   });
 });
 
@@ -32,31 +45,17 @@ const shutdown = async (signal) => {
   try {
     await healthServer.stop();
   } catch (err) {
-    log.error('lifecycle', 'Error closing health server', { error: err.message });
+    log.error('lifecycle', 'Error closing health server', { error: errMsg(err) });
   }
   try {
     await client.destroy();
   } catch (err) {
-    log.error('lifecycle', 'Error destroying client', { error: err.message });
+    log.error('lifecycle', 'Error destroying client', { error: errMsg(err) });
   }
   process.exit(0);
 };
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-
-// Without these handlers an uncaught error would exit the process silently —
-// orchestrators see only "container died," not the stack.
-const fatalExit = (kind, err, extra = {}) => {
-  log.fatal('lifecycle', kind, {
-    error: err instanceof Error ? err.message : String(err),
-    stack: err instanceof Error ? err.stack : undefined,
-    ...extra,
-  });
-  process.exit(1);
-};
-
-process.on('uncaughtException', (err, origin) => fatalExit('uncaughtException', err, { origin }));
-process.on('unhandledRejection', (reason) => fatalExit('unhandledRejection', reason));
 
 client.login(config.token).catch((err) => fatalExit('Failed to log in', err));
