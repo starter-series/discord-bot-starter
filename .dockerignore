@@ -4,6 +4,7 @@ node_modules
 .github
 docs
 tests
+coverage
 scripts
 *.md
 .eslintrc.json
