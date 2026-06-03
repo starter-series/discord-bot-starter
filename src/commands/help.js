@@ -16,6 +16,9 @@ module.exports = {
           .join('\n')
       );
 
-    await interaction.reply({ embeds: [embed] });
+    // Command descriptions are interpolated into the embed; a malicious or
+    // careless description string could carry @here / @everyone / @role / @user.
+    // parse: [] makes every mention inert text. (Same guard as search.js.)
+    await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
   },
 };

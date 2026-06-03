@@ -10,8 +10,11 @@ module.exports = {
       content: 'Pinging...',
       withResponse: true,
     });
-    const sent = response.resource.message;
-    const latency = sent.createdTimestamp - interaction.createdTimestamp;
+    // withResponse: true normally yields { resource: { message } }, but some
+    // edge interaction states return no resource. Guard it so we degrade to a
+    // 0ms round-trip reading instead of throwing on `.message` of undefined.
+    const sent = response.resource?.message;
+    const latency = sent ? sent.createdTimestamp - interaction.createdTimestamp : 0;
     await interaction.editReply(
       `Pong! Latency: ${latency}ms | API: ${interaction.client.ws.ping}ms`
     );
