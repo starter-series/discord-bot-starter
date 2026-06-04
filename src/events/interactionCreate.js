@@ -11,22 +11,41 @@ const globalLimiter = createRateLimiter(5, 60_000);
 // loader registers commands dynamically, add an upper-bound assertion here
 // — Map has no eviction by design.
 const perCommandLimiters = new Map();
+// Command names whose rateLimit we've already rejected, so a bad config logs
+// exactly once instead of on every interaction (log-flood on a hot command).
+const warnedBadConfig = new Set();
 
+// A well-formed override is `{ window: positive int ms, max: positive int }`.
+// Partial { max } or {} previously silently fell back to createRateLimiter's
+// parameter defaults (5, 60_000), so the user's attempt to override looked
+// active but matched the global — a stricter check rejects those.
+function isValidRateLimit(cfg) {
+  return (
+    typeof cfg === 'object' && cfg !== null &&
+    Number.isInteger(cfg.max) && cfg.max >= 1 &&
+    Number.isInteger(cfg.window) && cfg.window >= 1
+  );
+}
+
+// Resolve the limiter for a command WITHOUT throwing. A command that declares
+// no rateLimit uses the global limiter; one with a malformed rateLimit is
+// logged once and degrades to the global limiter rather than crashing the
+// dispatcher (a throw here escapes the per-command try/catch below and bubbles
+// to an unhandledRejection → process exit).
 function limiterFor(command) {
   const cfg = command.rateLimit;
   if (cfg === undefined || cfg === null) return globalLimiter;
-  // Strict shape check: partial { max } or {} previously silently fell back
-  // to createRateLimiter's parameter defaults (5, 60_000), so the user's
-  // attempt to override looked active but matched the global. Fail loud.
-  if (typeof cfg !== 'object' ||
-      !Number.isInteger(cfg.max) || cfg.max < 1 ||
-      !Number.isInteger(cfg.window) || cfg.window < 1) {
-    throw new Error(
-      `Command "${command.data?.name ?? '<unnamed>'}" has invalid rateLimit ` +
-      `${JSON.stringify(cfg)} — must be { window: positive integer ms, max: positive integer }`
-    );
+  const name = command.data?.name ?? '<unnamed>';
+  if (!isValidRateLimit(cfg)) {
+    if (!warnedBadConfig.has(name)) {
+      warnedBadConfig.add(name);
+      logger.error('interactionCreate',
+        `Command "${name}" has invalid rateLimit ${JSON.stringify(cfg)} ` +
+        `— must be { window: positive integer ms, max: positive integer }. ` +
+        `Falling back to the global limit.`);
+    }
+    return globalLimiter;
   }
-  const name = command.data.name;
   let limiter = perCommandLimiters.get(name);
   if (!limiter) {
     limiter = createRateLimiter(cfg.max, cfg.window);
@@ -69,17 +88,21 @@ module.exports = {
       return;
     }
 
-    const { limited, retryAfterMs } = limiterFor(command).check(interaction.user.id);
-    if (limited) {
-      logger.warn('interactionCreate', `Rate-limited user ${interaction.user.id} on ${command.data.name}`);
-      await safeRespond(interaction, {
-        content: `You're sending commands too fast. Please wait ${Math.ceil(retryAfterMs / 1000)} seconds.`,
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
+    // limiterFor + check() and execute() share one try/catch: any throw here
+    // (a malformed config slipped past validation, an exotic limiter store
+    // error, or a command body that rejects) must surface as a graceful
+    // ephemeral reply — never an unhandledRejection that exits the process.
     try {
+      const { limited, retryAfterMs } = limiterFor(command).check(interaction.user.id);
+      if (limited) {
+        logger.warn('interactionCreate', `Rate-limited user ${interaction.user.id} on ${command.data.name}`);
+        await safeRespond(interaction, {
+          content: `You're sending commands too fast. Please wait ${Math.ceil(retryAfterMs / 1000)} seconds.`,
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
       await command.execute(interaction);
     } catch (error) {
       logger.error('interactionCreate', `Error executing ${interaction.commandName}`, { error: errMsg(error) });
