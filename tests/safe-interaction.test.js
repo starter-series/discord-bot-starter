@@ -1,5 +1,6 @@
 const { DiscordAPIError } = require('discord.js');
 const { safeRespond } = require('../src/lib/safe-interaction');
+const logger = require('../src/lib/logger');
 
 function fakeInteraction(state = {}) {
   return {
@@ -13,6 +14,16 @@ function fakeInteraction(state = {}) {
 }
 
 describe('safeRespond', () => {
+  let warnSpy;
+  let errorSpy;
+  beforeEach(() => {
+    warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test('uses reply when interaction is fresh', async () => {
     const i = fakeInteraction();
     const r = await safeRespond(i, { content: 'hi' });
@@ -61,24 +72,40 @@ describe('safeRespond', () => {
     expect(r).toBeNull();
   });
 
-  test('swallows DiscordAPIError with code 429 (the other rate-limit shape)', async () => {
+  test('Discord 429 is classified as rate-limit: logged at WARN, not ERROR', async () => {
     // discord.js throws RateLimitError in some REST paths and DiscordAPIError
-    // with code 429 in others. Both must be swallowed.
+    // with code 429 in others. Both take the rate-limit branch → warn log.
     const err = new DiscordAPIError({ code: 429, message: 'Rate limit' }, 429, 429, 'POST', 'url', {});
     const i = fakeInteraction({ reply: jest.fn().mockRejectedValue(err) });
     const r = await safeRespond(i, { content: 'hi' });
     expect(r).toBeNull();
+    // The discriminator: a *real* Discord rate-limit is expected/transient, so
+    // it goes to warn. If this regresses to the generic error branch, the
+    // toHaveBeenCalled assertions below flip.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][1]).toMatch(/rate-limited by Discord/);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  test('does NOT swallow unrelated errors that happen to have code 429', async () => {
-    // The previous bare `error?.code === 429` check would swallow this and
-    // hide a real bug — narrowed to require a Discord-specific shape.
+  test('unrelated error with code 429 is NOT treated as a rate-limit: logged at ERROR, not WARN', async () => {
+    // The previous bare `error?.code === 429` check swallowed this into the
+    // rate-limit (warn) branch and hid a real upstream bug. The fix narrows
+    // the rate-limit branch to Discord-specific shapes, so a stray middleware
+    // error with code 429 must fall through to the generic ERROR branch.
+    //
+    // This assertion is non-tautological: it distinguishes the error branch
+    // (logger.error, the bug-surfacing path) from the rate-limit branch
+    // (logger.warn, the silent-drop path). If the narrowing regresses, this
+    // error lands in warn and the test fails — even though both branches
+    // return null.
     const err = Object.assign(new Error('upstream proxy 429'), { code: 429 });
     const i = fakeInteraction({ reply: jest.fn().mockRejectedValue(err) });
     const r = await safeRespond(i, { content: 'hi' });
-    // The catch still returns null (no rethrow), but it's logged at error
-    // level (the generic branch), not the warn rate-limit branch.
     expect(r).toBeNull();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][1]).toMatch(/Reply failed/);
+    // Crucially: it must NOT have gone down the rate-limit warn path.
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   test('after deferReply + editReply, a second response routes through followUp WITH the payload', async () => {
