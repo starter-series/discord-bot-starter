@@ -8,7 +8,9 @@
 #   5. Set the FLY_API_TOKEN secret in GitHub: `flyctl tokens create deploy`.
 #   6. Trigger the `Deploy to Fly.io` workflow from the Actions tab.
 #
-# `fly.toml` is gitignored — keep it local. This `.example` is checked in.
+# Commit the generated `fly.toml` when you use the GitHub Actions Fly deploy.
+# The file contains app routing/config only; keep tokens in Fly secrets and
+# GitHub Actions secrets, never in this file.
 
 app = "your-bot-app-name"
 primary_region = "nrt"
