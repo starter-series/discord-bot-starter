@@ -38,6 +38,11 @@ fly launch --no-deploy
 
 > Select **No** when asked about a database or Redis. Discord bots don't need them by default.
 
+Commit the resulting `fly.toml` before using GitHub Actions deploys. The workflow
+checks out the repository and runs `flyctl deploy --remote-only`, so the config
+must exist in git. Keep secrets out of `fly.toml`; use `fly secrets` and GitHub
+Actions secrets for tokens.
+
 ## 3. Set Secrets
 
 ```bash
@@ -91,7 +96,9 @@ The workflow will deploy and create a GitHub Release automatically.
 
 ### Bot goes offline
 - Check logs: `fly logs`
-- Make sure `fly.toml` does NOT have a `[[services]]` section (bots are workers, not web servers)
+- Keep the template's `[[services]]` health-check section unless you intentionally
+  remove the HTTP health server too. It points Fly at `/health` and keeps one
+  machine running for the persistent Discord gateway connection.
 
 ### "Out of memory"
 - Scale up: `fly scale vm shared-cpu-1x --memory 512`

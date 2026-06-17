@@ -125,7 +125,7 @@ Go to your GitHub repo > **Settings** > **Secrets and variables** > **Actions** 
 ### 6. Deploy
 
 1. Bump version: `npm run version:patch`
-2. Commit and push
+2. Commit and push, including the generated `fly.toml`
 3. Go to **Actions** tab > **Deploy to Fly.io** > **Run workflow**
 
 The workflow runs CI first, then deploys to Fly.io and creates a GitHub Release.
