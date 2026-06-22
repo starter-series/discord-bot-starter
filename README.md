@@ -30,6 +30,7 @@ Build your bot. Push to deploy.
 ```bash
 npx @starter-series/create my-discord-bot --template discord-bot
 cd my-discord-bot && npm install
+npm run preflight
 cp .env.example .env  # fill in DISCORD_TOKEN + DISCORD_CLIENT_ID
 npm run deploy-commands -- --dry-run
 npm run deploy-commands
@@ -41,6 +42,7 @@ npm run dev
 ```bash
 git clone https://github.com/starter-series/discord-bot-starter my-discord-bot
 cd my-discord-bot && npm install
+npm run preflight
 cp .env.example .env
 npm run deploy-commands -- --dry-run
 npm run deploy-commands
@@ -223,6 +225,9 @@ npm run deploy-commands
 
 # Validate command registration payloads without Discord credentials/network
 npm run deploy-commands -- --dry-run
+
+# Token-free preflight: build smoke + Jest
+npm run preflight
 
 # Build smoke used by CI (commands, events, .env.example)
 npm run build

@@ -30,6 +30,7 @@
 ```bash
 npx @starter-series/create my-discord-bot --template discord-bot
 cd my-discord-bot && npm install
+npm run preflight
 cp .env.example .env  # DISCORD_TOKEN + DISCORD_CLIENT_ID 입력
 npm run deploy-commands -- --dry-run
 npm run deploy-commands
@@ -41,6 +42,7 @@ npm run dev
 ```bash
 git clone https://github.com/starter-series/discord-bot-starter my-discord-bot
 cd my-discord-bot && npm install
+npm run preflight
 cp .env.example .env
 npm run deploy-commands -- --dry-run
 npm run deploy-commands
@@ -223,6 +225,9 @@ npm run deploy-commands
 
 # Discord 인증/네트워크 없이 등록 payload 검증
 npm run deploy-commands -- --dry-run
+
+# 토큰 없는 preflight: build smoke + Jest
+npm run preflight
 
 # CI와 같은 빌드 스모크 (commands, events, .env.example)
 npm run build
