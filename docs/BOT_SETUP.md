@@ -52,6 +52,14 @@ Guild-scoped commands register instantly. Global commands take up to 1 hour.
 
 ## 6. Register Commands
 
+Validate command payloads locally first. This does not require a token or Discord network access:
+
+```bash
+npm run deploy-commands -- --dry-run
+```
+
+Then register commands with Discord:
+
 ```bash
 npm run deploy-commands
 ```

@@ -2,7 +2,7 @@ const { Client, Events, GatewayIntentBits, Collection } = require('discord.js');
 const { loadCommands } = require('./commands');
 const { loadEvents } = require('./events');
 const { createHealthServer } = require('./lib/health');
-const config = require('./config');
+const { loadConfig } = require('./config');
 const log = require('./lib/logger');
 const { errMsg, errStack } = require('./lib/err');
 
@@ -17,6 +17,8 @@ const fatalExit = (kind, err, extra = {}) => {
 
 process.on('uncaughtException', (err, origin) => fatalExit('uncaughtException', err, { origin }));
 process.on('unhandledRejection', (reason) => fatalExit('unhandledRejection', reason));
+
+const config = loadConfig();
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],

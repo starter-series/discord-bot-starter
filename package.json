@@ -8,7 +8,8 @@
     "start": "node --enable-source-maps src/index.js",
     "dev": "node --enable-source-maps --watch src/index.js",
     "deploy-commands": "node scripts/deploy-commands.js",
-    "lint": "eslint src/",
+    "build": "node scripts/smoke.js",
+    "lint": "eslint src/ scripts/ tests/",
     "test": "jest --verbose --coverage",
     "version:patch": "node scripts/bump-version.js patch",
     "version:minor": "node scripts/bump-version.js minor",
@@ -17,6 +18,9 @@
   "dependencies": {
     "discord.js": "^14.26.4",
     "dotenv": "^17.4.2"
+  },
+  "overrides": {
+    "undici": "6.27.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

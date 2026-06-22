@@ -31,6 +31,7 @@ Build your bot. Push to deploy.
 npx @starter-series/create my-discord-bot --template discord-bot
 cd my-discord-bot && npm install
 cp .env.example .env  # fill in DISCORD_TOKEN + DISCORD_CLIENT_ID
+npm run deploy-commands -- --dry-run
 npm run deploy-commands
 npm run dev
 ```
@@ -41,6 +42,7 @@ npm run dev
 git clone https://github.com/starter-series/discord-bot-starter my-discord-bot
 cd my-discord-bot && npm install
 cp .env.example .env
+npm run deploy-commands -- --dry-run
 npm run deploy-commands
 npm run dev
 ```
@@ -70,8 +72,9 @@ See [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md) for the Discord Developer Por
 │       └── safe-interaction.js   # safeRespond() — reply/editReply/followUp wrapper that never throws
 ├── scripts/
 │   ├── deploy-commands.js        # Register commands with Discord API
+│   ├── smoke.js                  # Local/CI build smoke without Discord network
 │   └── bump-version.js           # Bump package.json version
-├── tests/                        # Jest — 27 tests, coverage gated at 70 % statements
+├── tests/                        # Jest — command/config/runtime tests, coverage gated at 70 % statements
 ├── Dockerfile                    # Production container
 ├── docker-compose.yml            # Dev with hot reload
 ├── .github/
@@ -111,6 +114,7 @@ Things that exist in this repo today, backed by code on disk.
   - SIGINT/SIGTERM trigger graceful shutdown of the gateway client and health server.
   - `--enable-source-maps` on `npm start` / `npm dev` for legible stack traces.
 - **CI pipeline** (every PR + push to main) — `npm audit`, ESLint, Jest with `--coverage` (statements / branches / functions / lines all gated), Docker build, Trivy CRITICAL/HIGH scan.
+- **Network-free validation** — `npm run deploy-commands -- --dry-run` serializes every slash command without Discord credentials; `npm run build` runs the local smoke check used by CI.
 - **CodeQL** — static analysis on push/PR and weekly.
 - **CD pipelines** — one-shot Railway or Fly.io deploy + auto GitHub Release; manual trigger from the Actions tab.
 - **Docker** — production `Dockerfile` + `docker-compose.yml` for hot-reload dev.
@@ -217,6 +221,12 @@ docker compose up
 # Register slash commands with Discord
 npm run deploy-commands
 
+# Validate command registration payloads without Discord credentials/network
+npm run deploy-commands -- --dry-run
+
+# Build smoke used by CI (commands, events, .env.example)
+npm run build
+
 # Bump version (updates package.json)
 npm run version:patch   # 1.0.0 → 1.0.1
 npm run version:minor   # 1.0.0 → 1.1.0
@@ -254,6 +264,12 @@ module.exports = {
 ```
 
 Then register: `npm run deploy-commands`
+
+Before using a real token, validate the registration payload locally:
+
+```bash
+npm run deploy-commands -- --dry-run
+```
 
 Commands are auto-loaded — no need to edit any other file.
 
