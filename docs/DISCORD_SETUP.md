@@ -69,6 +69,14 @@ On the **Bot** page, configure these settings:
 
 ## 6. Register Slash Commands
 
+Validate the command payloads locally first. This does not require a token or a Discord network call:
+
+```bash
+npm run deploy-commands -- --dry-run
+```
+
+Then register commands with Discord:
+
 ```bash
 npm run deploy-commands
 ```

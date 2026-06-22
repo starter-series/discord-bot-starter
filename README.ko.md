@@ -31,6 +31,7 @@
 npx @starter-series/create my-discord-bot --template discord-bot
 cd my-discord-bot && npm install
 cp .env.example .env  # DISCORD_TOKEN + DISCORD_CLIENT_ID 입력
+npm run deploy-commands -- --dry-run
 npm run deploy-commands
 npm run dev
 ```
@@ -41,6 +42,7 @@ npm run dev
 git clone https://github.com/starter-series/discord-bot-starter my-discord-bot
 cd my-discord-bot && npm install
 cp .env.example .env
+npm run deploy-commands -- --dry-run
 npm run deploy-commands
 npm run dev
 ```
@@ -70,8 +72,9 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
 │       └── safe-interaction.js   # safeRespond() — 절대 throw하지 않는 reply/editReply/followUp 래퍼
 ├── scripts/
 │   ├── deploy-commands.js        # Discord API에 커맨드 등록
+│   ├── smoke.js                  # Discord 네트워크 없이 로컬/CI 빌드 스모크
 │   └── bump-version.js           # package.json 버전 업
-├── tests/                        # Jest — 테스트 27개, 커버리지 임계값 statements 70 %
+├── tests/                        # Jest — 커맨드/설정/런타임 테스트, 커버리지 임계값 statements 70 %
 ├── Dockerfile                    # 프로덕션 컨테이너
 ├── docker-compose.yml            # 핫 리로드 개발 환경
 ├── .github/
@@ -111,6 +114,7 @@ Discord Developer Portal 설정은 [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md
   - SIGINT/SIGTERM이 게이트웨이 클라이언트 + 헬스 서버를 우아하게 종료.
   - `npm start` / `npm dev`에 `--enable-source-maps`로 읽기 쉬운 stack trace.
 - **CI 파이프라인** (모든 PR + main push 시) — `npm audit`, ESLint, Jest `--coverage` (statements / branches / functions / lines 모두 게이트), Docker 빌드, Trivy CRITICAL/HIGH 스캔.
+- **네트워크 없는 검증** — `npm run deploy-commands -- --dry-run`으로 Discord 인증 없이 슬래시 커맨드 payload를 직렬화하고, `npm run build`로 CI와 같은 로컬 스모크를 실행합니다.
 - **CodeQL** — push/PR + 주간 정적 분석.
 - **CD 파이프라인** — 원클릭 Railway 또는 Fly.io 배포 + GitHub Release 자동 생성. Actions 탭에서 수동 실행.
 - **Docker** — 프로덕션 `Dockerfile` + 핫 리로드 개발용 `docker-compose.yml`.
@@ -217,6 +221,12 @@ docker compose up
 # Discord에 슬래시 커맨드 등록
 npm run deploy-commands
 
+# Discord 인증/네트워크 없이 등록 payload 검증
+npm run deploy-commands -- --dry-run
+
+# CI와 같은 빌드 스모크 (commands, events, .env.example)
+npm run build
+
 # 버전 업 (package.json 자동 업데이트)
 npm run version:patch   # 1.0.0 → 1.0.1
 npm run version:minor   # 1.0.0 → 1.1.0
@@ -254,6 +264,12 @@ module.exports = {
 ```
 
 그리고 등록: `npm run deploy-commands`
+
+실제 토큰을 쓰기 전에 등록 payload를 로컬에서 검증할 수 있습니다:
+
+```bash
+npm run deploy-commands -- --dry-run
+```
 
 커맨드는 자동 로드됩니다 — 다른 파일을 수정할 필요 없습니다.
 
