@@ -28,7 +28,7 @@
 **[create-starter](https://github.com/starter-series/create-starter) 사용** (권장):
 
 ```bash
-npx @starter-series/create my-discord-bot --template discord-bot
+gh repo create my-discord-bot --template starter-series/discord-bot-starter --clone
 cd my-discord-bot && npm install
 npm run preflight
 cp .env.example .env  # DISCORD_TOKEN + DISCORD_CLIENT_ID 입력
