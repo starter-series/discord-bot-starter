@@ -34,9 +34,7 @@ const healthServer = createHealthServer(client);
 // Start the health server once the bot is ready so orchestrators (Fly.io,
 // Railway, Docker HEALTHCHECK) only get a 200 after the gateway connects.
 client.once(Events.ClientReady, () => {
-  healthServer.start().catch((err) => {
-    log.error('health', 'Failed to start health server', { error: errMsg(err) });
-  });
+  healthServer.start().catch((err) => fatalExit('Failed to start health server', err));
 });
 
 let shuttingDown = false;

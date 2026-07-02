@@ -66,15 +66,28 @@ function createHealthServer(client, options = {}) {
   });
 
   server.on('error', (err) => {
-    log.error('health', 'Health server error', { error: errMsg(err) });
+    // Bind-time failures (EADDRINUSE/EACCES) are surfaced by start()'s
+    // rejection below; only log here once the server is actually listening so
+    // this handler covers post-startup runtime errors without double-logging.
+    if (server.listening) {
+      log.error('health', 'Health server error', { error: errMsg(err) });
+    }
   });
 
   function start() {
-    return new Promise((resolve) => {
-      server.listen(port, () => {
+    return new Promise((resolve, reject) => {
+      const onError = (err) => {
+        server.removeListener('listening', onListening);
+        reject(err);
+      };
+      const onListening = () => {
+        server.removeListener('error', onError);
         log.info('health', `Health server listening on :${port}`);
         resolve(server);
-      });
+      };
+      server.once('error', onError);
+      server.once('listening', onListening);
+      server.listen(port);
     });
   }
 
