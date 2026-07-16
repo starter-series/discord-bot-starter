@@ -17,7 +17,7 @@
     "version:major": "node scripts/bump-version.js major"
   },
   "dependencies": {
-    "discord.js": "^14.26.4",
+    "discord.js": "^14.27.0",
     "dotenv": "^17.4.2"
   },
   "overrides": {
